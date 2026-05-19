@@ -1,0 +1,111 @@
+package com.pinterq.backend.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pinterq.backend.model.Flashcard;
+import com.pinterq.backend.model.Material;
+import com.pinterq.backend.model.Quiz;
+import com.pinterq.backend.repository.FlashcardRepository;
+import com.pinterq.backend.repository.QuizRepository;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class GeminiAiService {
+
+    private final FlashcardRepository flashcardRepository;
+    private final QuizRepository quizRepository;
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+
+    @Value("${gemini.api.url}")
+    private String apiUrl;
+
+    @Value("${gemini.api.key}")
+    private String apiKey;
+
+    public GeminiAiService(FlashcardRepository flashcardRepository, QuizRepository quizRepository) {
+        this.flashcardRepository = flashcardRepository;
+        this.quizRepository = quizRepository;
+        this.restTemplate = new RestTemplate();
+        this.objectMapper = new ObjectMapper();
+    }
+
+    public void generateStudyMaterials(String textContent, Material savedMaterial) {
+        try {
+            String prompt = "Berdasarkan teks berikut, buatkan 3 flashcards (pertanyaan dan jawaban) dan 3 soal kuis pilihan ganda. " +
+                    "Kembalikan HANYA dalam format JSON murni tanpa markdown (tanpa ```json). " +
+                    "Struktur: {\"flashcards\": [{\"question\": \"...\", \"answer\": \"...\"}], " +
+                    "\"quizzes\": [{\"question\": \"...\", \"optionA\": \"...\", \"optionB\": \"...\", \"optionC\": \"...\", \"optionD\": \"...\", \"correctAnswer\": \"A\"}]} " +
+                    "Teks: " + textContent;
+
+            // Body request Gemini API
+            Map<String, Object> part = new HashMap<>();
+            part.put("text", prompt);
+
+            Map<String, Object> content = new HashMap<>();
+            content.put("parts", List.of(part));
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("contents", List.of(content));
+
+            // HTTP POST
+            String url = apiUrl + "?key=" + apiKey;
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                JsonNode root = objectMapper.readTree(response.getBody());
+                String aiResponseText = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
+
+                aiResponseText = aiResponseText.replaceAll("^```json\\n?", "").replaceAll("\\n?```$", "").trim();
+
+                // Parsing JSON dari AI
+                JsonNode resultJson = objectMapper.readTree(aiResponseText);
+
+                // Simpan Flashcards
+                JsonNode flashcardsNode = resultJson.path("flashcards");
+                if (flashcardsNode.isArray()) {
+                    for (JsonNode node : flashcardsNode) {
+                        Flashcard flashcard = Flashcard.builder()
+                                .question(node.path("question").asText())
+                                .answer(node.path("answer").asText())
+                                .material(savedMaterial)
+                                .isMemorized(false)
+                                .build();
+                        flashcardRepository.save(flashcard);
+                    }
+                }
+
+                // Simpan Quizzes
+                JsonNode quizzesNode = resultJson.path("quizzes");
+                if (quizzesNode.isArray()) {
+                    for (JsonNode node : quizzesNode) {
+                        Quiz quiz = Quiz.builder()
+                                .question(node.path("question").asText())
+                                .optionA(node.path("optionA").asText())
+                                .optionB(node.path("optionB").asText())
+                                .optionC(node.path("optionC").asText())
+                                .optionD(node.path("optionD").asText())
+                                .correctAnswer(node.path("correctAnswer").asText())
+                                .material(savedMaterial)
+                                .build();
+                        quizRepository.save(quiz);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error generating study materials: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+}
