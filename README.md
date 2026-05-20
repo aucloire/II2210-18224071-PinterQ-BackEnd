@@ -3,14 +3,14 @@
 This repository houses the backend architecture for PinterQ. Built with Java Spring Boot, it serves as the central brain of the application—handling relational data persistence, business logic, and orchestrating prompts with Google's Gemini AI to generate adaptive educational content.
 
 ## ✨ Features
-* **Generative AI Integration:** Communicates with the `gemini-1.5-flash` model via REST to parse raw notes into structured JSON quizzes and flashcards.
+* **Generative AI Integration:** Communicates with the `gemini-2.5-flash` model via REST to parse raw notes into structured JSON quizzes and flashcards.
 * **Adaptive Prompt Engineering:** Dynamically injects targeted context (HOTS vs. Basic Concepts) based on frontend triggers to adjust quiz difficulty.
 * **Relational Data Management:** Manages hierarchical data mappings between Users, Categories (Subjects), Materials, Flashcards, and Quizzes.
 * **Robust REST API:** Exposes clean endpoints for seamless frontend consumption.
 
 ## 🛠️ Tech Stack
 * **Language:** Java 21
-* **Framework:** Spring Boot 3.x
+* **Framework:** Spring Boot 4.0.6
 * **Database:** PostgreSQL
 * **ORM:** Spring Data JPA / Hibernate
 * **AI Provider:** Google Gemini API
