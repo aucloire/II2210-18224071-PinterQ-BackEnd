@@ -9,6 +9,8 @@ import com.pinterq.backend.repository.MaterialRepository;
 import com.pinterq.backend.repository.QuizRepository;
 import com.pinterq.backend.repository.UserRepository;
 import com.pinterq.backend.service.GeminiAiService;
+
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -66,5 +68,26 @@ public class StudyController {
                           && q.getMaterial().getCategory().getId().equals(categoryId))
                 .toList();
         return ResponseEntity.ok(quizzes);
+    }
+
+    @PostMapping("/generate-adaptive")
+    public ResponseEntity<?> generateAdaptive(@RequestBody AdaptiveRequest request) {
+        Category category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new RuntimeException("Category not found"));
+
+        Material latestMaterial = materialRepository.findAll().stream()
+                .filter(m -> m.getCategory() != null && m.getCategory().getId().equals(category.getId()))
+                .reduce((first, second) -> second)
+                .orElseThrow(() -> new RuntimeException("Belum ada materi di matkul ini"));
+
+        geminiAiService.generateAdaptiveQuizzes(latestMaterial.getContent(), latestMaterial, request.getDifficulty());
+
+        return ResponseEntity.ok("Soal adaptif " + request.getDifficulty() + " berhasil ditambahkan!");
+    }
+
+    @Data
+    static class AdaptiveRequest {
+        private Long categoryId;
+        private String difficulty;
     }
 }

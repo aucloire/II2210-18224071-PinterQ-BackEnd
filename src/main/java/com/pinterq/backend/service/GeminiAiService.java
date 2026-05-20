@@ -41,9 +41,10 @@ public class GeminiAiService {
         try {
             String prompt = "Berdasarkan teks berikut, ekstrak informasi penting dan buatkan flashcards (pertanyaan dan jawaban singkat) " +
                     "serta soal kuis pilihan ganda yang komprehensif. Jumlah flashcard dan kuis menyesuaikan dengan kepadatan materi, buatlah seakurat dan sebanyak yang diperlukan. " +
+                    "ATURAN PENJELASAN KUIS: Penjelasan (explanation) HARUS bersifat mandiri, komprehensif, dan bergaya seperti guru yang sedang mengajar langsung. DILARANG KERAS menggunakan kata-kata seperti 'Berdasarkan teks...', 'Pada teks dijelaskan...', atau 'Teks menyebutkan...'. " +
                     "Kembalikan HANYA dalam format JSON murni tanpa markdown (tanpa ```json). " +
                     "Struktur: {\"flashcards\": [{\"question\": \"...\", \"answer\": \"...\"}], " +
-                    "\"quizzes\": [{\"question\": \"...\", \"optionA\": \"...\", \"optionB\": \"...\", \"optionC\": \"...\", \"optionD\": \"...\", \"correctAnswer\": \"A\", \"explanation\": \"Penjelasan singkat kenapa jawabannya benar\"}]} " +
+                    "\"quizzes\": [{\"question\": \"...\", \"optionA\": \"...\", \"optionB\": \"...\", \"optionC\": \"...\", \"optionD\": \"...\", \"correctAnswer\": \"A\", \"explanation\": \"...\"}]} " +
                     "Teks: " + textContent;
 
             // Body request Gemini API
@@ -107,6 +108,68 @@ public class GeminiAiService {
             }
         } catch (Exception e) {
             System.err.println("Error generating study materials: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public void generateAdaptiveQuizzes(String textContent, com.pinterq.backend.model.Material savedMaterial, String difficulty) {
+        try {
+            String difficultyInstruction = "";
+            if ("HOTS".equals(difficulty)) {
+                difficultyInstruction = "Tingkat kesulitan: SANGAT SULIT (HOTS - Higher Order Thinking Skills). Fokus pada studi kasus, analisis kritis, evaluasi, dan pemecahan masalah. Jangan berikan soal hafalan murni.";
+            } else {
+                difficultyInstruction = "Tingkat kesulitan: DASAR (Beginner). Fokus pada definisi simpel, fakta utama, dan pemahaman konsep paling fundamental. Buat bahasanya sangat mudah dipahami.";
+            }
+
+            String prompt = "Berdasarkan teks berikut, buatkan 3-5 soal kuis pilihan ganda tambahan. " +
+                    difficultyInstruction + " " +
+                    "ATURAN PENJELASAN KUIS: Penjelasan (explanation) HARUS bersifat mandiri, komprehensif, dan bergaya seperti guru yang sedang mengajar langsung. DILARANG KERAS menggunakan kata-kata seperti 'Berdasarkan teks...', 'Pada teks dijelaskan...', atau 'Teks menyebutkan...'. " +
+                    "Kembalikan HANYA dalam format JSON murni tanpa markdown. " +
+                    "Struktur: {\"quizzes\": [{\"question\": \"...\", \"optionA\": \"...\", \"optionB\": \"...\", \"optionC\": \"...\", \"optionD\": \"...\", \"correctAnswer\": \"A\", \"explanation\": \"...\"}]} " +
+                    "Teks: " + textContent;
+
+            Map<String, Object> part = new HashMap<>();
+            part.put("text", prompt);
+
+            Map<String, Object> content = new HashMap<>();
+            content.put("parts", List.of(part));
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("contents", List.of(content));
+
+            String url = apiUrl + "?key=" + apiKey;
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                JsonNode root = objectMapper.readTree(response.getBody());
+                String aiResponseText = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
+                aiResponseText = aiResponseText.replaceAll("^```json\\n?", "").replaceAll("\\n?```$", "").trim();
+                
+                JsonNode resultJson = objectMapper.readTree(aiResponseText);
+                JsonNode quizzesNode = resultJson.path("quizzes");
+                
+                if (quizzesNode.isArray()) {
+                    for (JsonNode node : quizzesNode) {
+                        com.pinterq.backend.model.Quiz quiz = com.pinterq.backend.model.Quiz.builder()
+                                .question(node.path("question").asText())
+                                .optionA(node.path("optionA").asText())
+                                .optionB(node.path("optionB").asText())
+                                .optionC(node.path("optionC").asText())
+                                .optionD(node.path("optionD").asText())
+                                .correctAnswer(node.path("correctAnswer").asText())
+                                .explanation(node.path("explanation").asText())
+                                .material(savedMaterial)
+                                .build();
+                        quizRepository.save(quiz);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error generating adaptive quizzes: " + e.getMessage());
             e.printStackTrace();
         }
     }
