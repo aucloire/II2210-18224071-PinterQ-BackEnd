@@ -39,10 +39,11 @@ public class GeminiAiService {
 
     public void generateStudyMaterials(String textContent, Material savedMaterial) {
         try {
-            String prompt = "Berdasarkan teks berikut, buatkan 3 flashcards (pertanyaan dan jawaban) dan 3 soal kuis pilihan ganda. " +
+            String prompt = "Berdasarkan teks berikut, ekstrak informasi penting dan buatkan flashcards (pertanyaan dan jawaban singkat) " +
+                    "serta soal kuis pilihan ganda yang komprehensif. Jumlah flashcard dan kuis menyesuaikan dengan kepadatan materi, buatlah seakurat dan sebanyak yang diperlukan. " +
                     "Kembalikan HANYA dalam format JSON murni tanpa markdown (tanpa ```json). " +
                     "Struktur: {\"flashcards\": [{\"question\": \"...\", \"answer\": \"...\"}], " +
-                    "\"quizzes\": [{\"question\": \"...\", \"optionA\": \"...\", \"optionB\": \"...\", \"optionC\": \"...\", \"optionD\": \"...\", \"correctAnswer\": \"A\"}]} " +
+                    "\"quizzes\": [{\"question\": \"...\", \"optionA\": \"...\", \"optionB\": \"...\", \"optionC\": \"...\", \"optionD\": \"...\", \"correctAnswer\": \"A\", \"explanation\": \"Penjelasan singkat kenapa jawabannya benar\"}]} " +
                     "Teks: " + textContent;
 
             // Body request Gemini API
@@ -97,6 +98,7 @@ public class GeminiAiService {
                                 .optionC(node.path("optionC").asText())
                                 .optionD(node.path("optionD").asText())
                                 .correctAnswer(node.path("correctAnswer").asText())
+                                .explanation(node.path("explanation").asText())
                                 .material(savedMaterial)
                                 .build();
                         quizRepository.save(quiz);

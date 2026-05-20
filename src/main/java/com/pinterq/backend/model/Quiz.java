@@ -36,4 +36,7 @@ public class Quiz {
 
     @Column(name = "correct_answer", nullable = false, length = 1)
     private String correctAnswer;
+
+    @Column(columnDefinition = "TEXT")
+    private String explanation;
 }
