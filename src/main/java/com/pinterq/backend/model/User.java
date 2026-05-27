@@ -24,6 +24,14 @@ public class User {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private String role = "USER";
+
+    @Column(name = "is_approved")
+    @Builder.Default
+    private Boolean isApproved = true;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 }

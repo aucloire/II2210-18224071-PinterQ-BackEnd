@@ -69,7 +69,14 @@ public class GeminiAiService {
                 JsonNode root = objectMapper.readTree(response.getBody());
                 String aiResponseText = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
 
-                aiResponseText = aiResponseText.replaceAll("^```json\\n?", "").replaceAll("\\n?```$", "").trim();
+                System.out.println("AI RAW RESPONSE: " + aiResponseText);
+
+                // Cleaning more robustly: find first { and last }
+                int firstBrace = aiResponseText.indexOf("{");
+                int lastBrace = aiResponseText.lastIndexOf("}");
+                if (firstBrace != -1 && lastBrace != -1) {
+                    aiResponseText = aiResponseText.substring(firstBrace, lastBrace + 1);
+                }
 
                 // Parsing JSON dari AI
                 JsonNode resultJson = objectMapper.readTree(aiResponseText);
@@ -147,7 +154,14 @@ public class GeminiAiService {
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                 JsonNode root = objectMapper.readTree(response.getBody());
                 String aiResponseText = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
-                aiResponseText = aiResponseText.replaceAll("^```json\\n?", "").replaceAll("\\n?```$", "").trim();
+                
+                System.out.println("AI ADAPTIVE RAW RESPONSE: " + aiResponseText);
+
+                int firstBrace = aiResponseText.indexOf("{");
+                int lastBrace = aiResponseText.lastIndexOf("}");
+                if (firstBrace != -1 && lastBrace != -1) {
+                    aiResponseText = aiResponseText.substring(firstBrace, lastBrace + 1);
+                }
                 
                 JsonNode resultJson = objectMapper.readTree(aiResponseText);
                 JsonNode quizzesNode = resultJson.path("quizzes");
