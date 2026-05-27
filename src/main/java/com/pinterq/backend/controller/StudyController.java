@@ -2,10 +2,12 @@ package com.pinterq.backend.controller;
 
 import com.pinterq.backend.model.Category;
 import com.pinterq.backend.model.Material;
+import com.pinterq.backend.model.QuizAttempt;
 import com.pinterq.backend.model.User;
 import com.pinterq.backend.repository.CategoryRepository;
 import com.pinterq.backend.repository.FlashcardRepository;
 import com.pinterq.backend.repository.MaterialRepository;
+import com.pinterq.backend.repository.QuizAttemptRepository;
 import com.pinterq.backend.repository.QuizRepository;
 import com.pinterq.backend.repository.UserRepository;
 import com.pinterq.backend.service.GeminiAiService;
@@ -14,6 +16,10 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/study")
@@ -26,12 +32,13 @@ public class StudyController {
     private final CategoryRepository categoryRepository;
     private final FlashcardRepository flashcardRepository;
     private final QuizRepository quizRepository;
+    private final QuizAttemptRepository quizAttemptRepository;
 
     @PostMapping("/generate")
     public ResponseEntity<?> generate(@RequestBody GenerateRequest request) {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        
+
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Category not found"));
 
@@ -52,8 +59,8 @@ public class StudyController {
     @GetMapping("/flashcards/{categoryId}")
     public ResponseEntity<?> getFlashcardsByCategory(@PathVariable Long categoryId) {
         var flashcards = flashcardRepository.findAll().stream()
-                .filter(f -> f.getMaterial() != null 
-                          && f.getMaterial().getCategory() != null 
+                .filter(f -> f.getMaterial() != null
+                          && f.getMaterial().getCategory() != null
                           && f.getMaterial().getCategory().getId().equals(categoryId))
                 .toList();
         return ResponseEntity.ok(flashcards);
@@ -62,8 +69,8 @@ public class StudyController {
     @GetMapping("/quizzes/{categoryId}")
     public ResponseEntity<?> getQuizzesByCategory(@PathVariable Long categoryId) {
         var quizzes = quizRepository.findAll().stream()
-                .filter(q -> q.getMaterial() != null 
-                          && q.getMaterial().getCategory() != null 
+                .filter(q -> q.getMaterial() != null
+                          && q.getMaterial().getCategory() != null
                           && q.getMaterial().getCategory().getId().equals(categoryId))
                 .toList();
         return ResponseEntity.ok(quizzes);
@@ -84,9 +91,53 @@ public class StudyController {
         return ResponseEntity.ok("Soal adaptif " + request.getDifficulty() + " berhasil ditambahkan!");
     }
 
+    @PostMapping("/submit-attempt")
+    public ResponseEntity<?> submitAttempt(@RequestBody SubmitAttemptRequest request) {
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        Material material = materialRepository.findById(request.getMaterialId())
+                .orElseThrow(() -> new RuntimeException("Materi not found"));
+
+        QuizAttempt attempt = QuizAttempt.builder()
+                .user(user)
+                .material(material)
+                .score(BigDecimal.valueOf(request.getScore()))
+                .build();
+
+        QuizAttempt saved = quizAttemptRepository.save(attempt);
+
+        return ResponseEntity.ok(Map.of(
+            "attemptId", saved.getId(),
+            "score", saved.getScore(),
+            "attemptDate", saved.getAttemptDate() != null ? saved.getAttemptDate().toString() : ""
+        ));
+    }
+
+    @GetMapping("/history/{userId}")
+    public ResponseEntity<?> getHistory(@PathVariable Long userId) {
+        var attempts = quizAttemptRepository.findAll().stream()
+                .filter(a -> a.getUser().getId().equals(userId))
+                .map(a -> Map.of(
+                    "attemptId", a.getId(),
+                    "materialId", a.getMaterial().getId(),
+                    "materialTitle", a.getMaterial().getTitle(),
+                    "score", a.getScore(),
+                    "attemptDate", a.getAttemptDate() != null ? a.getAttemptDate().toString() : ""
+                ))
+                .toList();
+        return ResponseEntity.ok(attempts);
+    }
+
     @Data
     static class AdaptiveRequest {
         private Long categoryId;
         private String difficulty;
+    }
+
+    @Data
+    static class SubmitAttemptRequest {
+        private Long userId;
+        private Long materialId;
+        private double score;
     }
 }
