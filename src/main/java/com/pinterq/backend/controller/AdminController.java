@@ -19,14 +19,14 @@ public class AdminController {
     @GetMapping("/pending-users")
     public ResponseEntity<?> getPendingUsers() {
         List<User> pending = userRepository.findAll().stream()
-                .filter(u -> u.getIsApproved() == null || !u.getIsApproved())
+                .filter(u -> u.getApprovalStatus() == User.ApprovalStatus.PENDING)
                 .toList();
         return ResponseEntity.ok(pending.stream().map(u -> Map.of(
                 "id", u.getId(),
                 "username", u.getUsername(),
                 "email", u.getEmail(),
-                "role", u.getRole() != null ? u.getRole() : "USER",
-                "isApproved", u.getIsApproved() != null ? u.getIsApproved() : false,
+                "role", u.getRole() != null ? u.getRole().name() : "USER",
+                "approvalStatus", u.getApprovalStatus().name(),
                 "createdAt", u.getCreatedAt() != null ? u.getCreatedAt().toString() : ""
         )));
     }
@@ -38,8 +38,8 @@ public class AdminController {
                 "id", u.getId(),
                 "username", u.getUsername(),
                 "email", u.getEmail(),
-                "role", u.getRole() != null ? u.getRole() : "USER",
-                "isApproved", u.getIsApproved() != null ? u.getIsApproved() : false,
+                "role", u.getRole() != null ? u.getRole().name() : "USER",
+                "approvalStatus", u.getApprovalStatus().name(),
                 "createdAt", u.getCreatedAt() != null ? u.getCreatedAt().toString() : ""
         )));
     }
@@ -47,8 +47,8 @@ public class AdminController {
     @PutMapping("/approve/{userId}")
     public ResponseEntity<?> approveUser(@PathVariable Long userId) {
         return userRepository.findById(userId).map(user -> {
-            user.setIsApproved(true);
-            user.setRole("USER");
+            user.setApprovalStatus(User.ApprovalStatus.APPROVED);
+            user.setRole(User.Role.USER);
             userRepository.save(user);
             return ResponseEntity.ok(Map.of("message", "User approved", "userId", userId));
         }).orElse(ResponseEntity.notFound().build());
@@ -57,7 +57,7 @@ public class AdminController {
     @PutMapping("/reject/{userId}")
     public ResponseEntity<?> rejectUser(@PathVariable Long userId) {
         return userRepository.findById(userId).map(user -> {
-            user.setIsApproved(false);
+            user.setApprovalStatus(User.ApprovalStatus.REJECTED);
             userRepository.save(user);
             return ResponseEntity.ok(Map.of("message", "User rejected", "userId", userId));
         }).orElse(ResponseEntity.notFound().build());
@@ -70,7 +70,7 @@ public class AdminController {
             return ResponseEntity.badRequest().body(Map.of("error", "Role tidak valid"));
         }
         return userRepository.findById(userId).map(user -> {
-            user.setRole(role);
+            user.setRole(User.Role.valueOf(role));
             userRepository.save(user);
             return ResponseEntity.ok(Map.of("message", "Role updated", "userId", userId, "role", role));
         }).orElse(ResponseEntity.notFound().build());
