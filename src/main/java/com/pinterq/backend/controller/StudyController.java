@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -90,7 +91,7 @@ public class StudyController {
         return ResponseEntity.ok("Soal adaptif " + request.getDifficulty() + " berhasil ditambahkan!");
     }
 
-    @PostMapping("/quiz-attempt")
+    @PostMapping("/submit-attempt")
     public ResponseEntity<?> submitAttempt(@RequestBody SubmitAttemptRequest request) {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -112,7 +113,7 @@ public class StudyController {
         ));
     }
 
-    @GetMapping("/quiz-history/{userId}")
+    @GetMapping("/history/{userId}")
     public ResponseEntity<?> getHistory(@PathVariable Long userId) {
         var attempts = quizAttemptRepository.findAll().stream()
                 .filter(a -> a.getUser().getId().equals(userId))

@@ -2,6 +2,8 @@ package com.pinterq.backend.config;
 
 import com.pinterq.backend.model.Category;
 import com.pinterq.backend.model.User;
+import com.pinterq.backend.model.User.ApprovalStatus;
+import com.pinterq.backend.model.User.Role;
 import com.pinterq.backend.repository.CategoryRepository;
 import com.pinterq.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,8 +26,8 @@ public class DataSeeder {
                         .username("pinterq_admin")
                         .email("admin@pinterq.com")
                         .passwordHash(passwordEncoder.encode("password123"))
-                        .role("SUPERADMIN")
-                        .isApproved(true)
+                        .role(Role.SUPERADMIN)
+                        .approvalStatus(ApprovalStatus.APPROVED)
                         .build();
                 userRepository.save(admin);
 
@@ -38,9 +40,9 @@ public class DataSeeder {
                 User testUser = User.builder()
                         .username("test_user")
                         .email("test@pinterq.com")
-                        .passwordHash("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGdjGj/n3.rs5xE1gG1nL1m1cHy")
-                        .role("USER")
-                        .isApproved(true)
+                        .passwordHash(passwordEncoder.encode("password123"))
+                        .role(Role.USER)
+                        .approvalStatus(ApprovalStatus.APPROVED)
                         .build();
                 userRepository.save(testUser);
                 System.out.println("TEST USER DIBUAT: test_user / password123");
