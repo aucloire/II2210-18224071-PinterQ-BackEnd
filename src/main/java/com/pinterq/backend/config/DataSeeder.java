@@ -4,12 +4,17 @@ import com.pinterq.backend.model.Category;
 import com.pinterq.backend.model.User;
 import com.pinterq.backend.repository.CategoryRepository;
 import com.pinterq.backend.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration
+@RequiredArgsConstructor
 public class DataSeeder {
+
+    private final PasswordEncoder passwordEncoder;
 
     @Bean
     CommandLineRunner initDatabase(UserRepository userRepository, CategoryRepository categoryRepository) {
@@ -18,7 +23,9 @@ public class DataSeeder {
                 User admin = User.builder()
                         .username("pinterq_admin")
                         .email("admin@pinterq.com")
-                        .passwordHash("password123")
+                        .passwordHash(passwordEncoder.encode("password123"))
+                        .role("SUPERADMIN")
+                        .isApproved(true)
                         .build();
                 userRepository.save(admin);
 
@@ -27,7 +34,7 @@ public class DataSeeder {
                         .user(admin)
                         .build();
                 categoryRepository.save(category);
-                
+
                 System.out.println("========== DATA DUMMY BERHASIL DITAMBAHKAN ==========");
             }
         };
