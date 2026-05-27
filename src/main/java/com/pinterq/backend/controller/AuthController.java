@@ -34,6 +34,11 @@ public class AuthController {
         if (userRepository.findAll().stream().anyMatch(u -> u.getUsername().equals(request.getUsername()))) {
             return ResponseEntity.badRequest().body("Username sudah dipakai");
         }
+
+        if (userRepository.findAll().stream().anyMatch(u -> u.getEmail().equals(request.getEmail()))) {
+            return ResponseEntity.badRequest().body("Email sudah terdaftar");
+        }
+        
         User newUser = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
