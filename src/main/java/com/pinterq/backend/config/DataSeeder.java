@@ -35,6 +35,16 @@ public class DataSeeder {
                         .build();
                 categoryRepository.save(category);
 
+                User testUser = User.builder()
+                        .username("test_user")
+                        .email("test@pinterq.com")
+                        .passwordHash("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGdjGj/n3.rs5xE1gG1nL1m1cHy")
+                        .role("USER")
+                        .isApproved(true)
+                        .build();
+                userRepository.save(testUser);
+                System.out.println("TEST USER DIBUAT: test_user / password123");
+
                 System.out.println("========== DATA DUMMY BERHASIL DITAMBAHKAN ==========");
             }
         };
