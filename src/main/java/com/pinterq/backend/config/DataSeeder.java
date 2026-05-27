@@ -12,6 +12,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.Optional;
+
 @Configuration
 @RequiredArgsConstructor
 public class DataSeeder {
@@ -21,9 +23,14 @@ public class DataSeeder {
     @Bean
     CommandLineRunner initDatabase(UserRepository userRepository, CategoryRepository categoryRepository) {
         return args -> {
-            // Selalu pastikan pinterq_admin ada
-            if (userRepository.findByUsername("pinterq_admin").isEmpty()) {
-                User admin = User.builder()
+            System.out.println(">>> RUNNING DATA SEEDER...");
+            
+            // Force Create/Update pinterq_admin
+            Optional<User> existingAdmin = userRepository.findByUsername("pinterq_admin");
+            User admin;
+            
+            if (existingAdmin.isEmpty()) {
+                admin = User.builder()
                         .username("pinterq_admin")
                         .email("admin@pinterq.com")
                         .passwordHash(passwordEncoder.encode("password123"))
@@ -32,33 +39,26 @@ public class DataSeeder {
                         .build();
                 userRepository.save(admin);
                 System.out.println("ADMIN CREATED: pinterq_admin / password123");
-                
-                // Buat kategori default jika belum ada
-                if (categoryRepository.findAll().isEmpty()) {
-                    Category category = Category.builder()
-                            .name("Umum")
-                            .user(admin)
-                            .build();
-                    categoryRepository.save(category);
-                }
             } else {
-                System.out.println("ADMIN ALREADY EXISTS: pinterq_admin");
-            }
-            
-            // Buat test_user jika belum ada
-            if (userRepository.findByUsername("test_user").isEmpty()) {
-                User testUser = User.builder()
-                        .username("test_user")
-                        .email("test@pinterq.com")
-                        .passwordHash(passwordEncoder.encode("password123"))
-                        .role(Role.USER)
-                        .approvalStatus(ApprovalStatus.APPROVED)
-                        .build();
-                userRepository.save(testUser);
-                System.out.println("TEST USER CREATED: test_user / password123");
+                admin = existingAdmin.get();
+                admin.setPasswordHash(passwordEncoder.encode("password123"));
+                admin.setRole(Role.SUPERADMIN);
+                admin.setApprovalStatus(ApprovalStatus.APPROVED);
+                userRepository.save(admin);
+                System.out.println("ADMIN PASSWORD RESET: pinterq_admin / password123");
             }
 
-            System.out.println("========== DATA SEEDING CHECK COMPLETED ==========");
+            // Ensure Default Category
+            if (categoryRepository.findAll().isEmpty()) {
+                Category category = Category.builder()
+                        .name("Umum")
+                        .user(admin)
+                        .build();
+                categoryRepository.save(category);
+                System.out.println("DEFAULT CATEGORY CREATED");
+            }
+
+            System.out.println("========== DATA SEEDER COMPLETED ==========");
         };
     }
 }
