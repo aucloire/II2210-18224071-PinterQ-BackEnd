@@ -59,7 +59,14 @@ public class AuthController {
                 .findFirst()
                 .orElse(null);
 
-        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Username atau password salah");
+        }
+
+        boolean passwordValid = passwordEncoder.matches(request.getPassword(), user.getPasswordHash())
+            || request.getPassword().equals(user.getPasswordHash()); // fallback plain text for old users
+
+        if (!passwordValid) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Username atau password salah");
         }
 
