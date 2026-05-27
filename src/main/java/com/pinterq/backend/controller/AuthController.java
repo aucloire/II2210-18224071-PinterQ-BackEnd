@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.CrossOrigin;
 
 import com.pinterq.backend.model.User;
 import com.pinterq.backend.repository.UserRepository;
@@ -31,7 +30,6 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class AuthController {
 
     private final UserRepository userRepository;
@@ -66,12 +64,10 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody AuthRequest request) {
-        if (userRepository.findAll().stream()
-                .anyMatch(u -> u.getUsername().equals(request.getUsername()))) {
+        if (userRepository.findByUsername(request.getUsername()).isPresent()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Username sudah dipakai"));
         }
-        if (userRepository.findAll().stream()
-                .anyMatch(u -> u.getEmail().equals(request.getEmail()))) {
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Email sudah dipakai"));
         }
 
