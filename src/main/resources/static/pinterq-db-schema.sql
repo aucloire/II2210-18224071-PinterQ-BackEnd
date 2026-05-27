@@ -1,9 +1,11 @@
--- 1. Tabel Users (Kredensial dengan Username & Email)
+-- 1. Tabel Users (Kredensial dengan Username & Email + Role)
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'USER',
+    is_approved BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -43,7 +45,8 @@ CREATE TABLE quizzes (
     option_b VARCHAR(255) NOT NULL,
     option_c VARCHAR(255) NOT NULL,
     option_d VARCHAR(255) NOT NULL,
-    correct_answer VARCHAR(1) NOT NULL -- Simpan 'A', 'B', 'C', atau 'D'
+    correct_answer VARCHAR(1) NOT NULL,
+    difficulty VARCHAR(10) DEFAULT 'DASAR'
 );
 
 -- 6. Tabel Quiz Attempts (Track Progress)

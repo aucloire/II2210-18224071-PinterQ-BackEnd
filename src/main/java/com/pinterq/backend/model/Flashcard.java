@@ -25,5 +25,6 @@ public class Flashcard {
     private String answer;
 
     @Column(name = "is_memorized")
-    private Boolean isMemorized;
+    @Builder.Default
+    private Boolean isMemorized = false;
 }

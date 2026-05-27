@@ -28,7 +28,7 @@ public class User {
     @Builder.Default
     private String role = "USER";
 
-    @Column(name = "is_approved")
+    @Column(name = "is_approved", nullable = false)
     @Builder.Default
     private Boolean isApproved = true;
 
