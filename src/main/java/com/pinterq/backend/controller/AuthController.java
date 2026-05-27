@@ -68,13 +68,13 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "Email sudah dipakai"));
         }
 
-        // Default: USER role, PENDING approval (auto-approved for demo)
+        // Default: USER role, PENDING approval
         User newUser = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .role(User.Role.USER)
-                .approvalStatus(User.ApprovalStatus.APPROVED)
+                .approvalStatus(User.ApprovalStatus.PENDING)
                 .build();
         userRepository.save(newUser);
 
@@ -90,10 +90,8 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthRequest request) {
-        User user = userRepository.findAll().stream()
-                .filter(u -> u.getUsername().equals(request.getUsername())
-                          && passwordEncoder.matches(request.getPassword(), u.getPasswordHash()))
-                .findFirst()
+        User user = userRepository.findByUsername(request.getUsername())
+                .filter(u -> passwordEncoder.matches(request.getPassword(), u.getPasswordHash()))
                 .orElse(null);
 
         if (user == null) {

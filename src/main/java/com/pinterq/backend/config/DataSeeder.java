@@ -21,7 +21,8 @@ public class DataSeeder {
     @Bean
     CommandLineRunner initDatabase(UserRepository userRepository, CategoryRepository categoryRepository) {
         return args -> {
-            if (userRepository.count() == 0) {
+            // Selalu pastikan pinterq_admin ada
+            if (userRepository.findByUsername("pinterq_admin").isEmpty()) {
                 User admin = User.builder()
                         .username("pinterq_admin")
                         .email("admin@pinterq.com")
@@ -30,13 +31,22 @@ public class DataSeeder {
                         .approvalStatus(ApprovalStatus.APPROVED)
                         .build();
                 userRepository.save(admin);
-
-                Category category = Category.builder()
-                        .name("Umum")
-                        .user(admin)
-                        .build();
-                categoryRepository.save(category);
-
+                System.out.println("ADMIN CREATED: pinterq_admin / password123");
+                
+                // Buat kategori default jika belum ada
+                if (categoryRepository.findAll().isEmpty()) {
+                    Category category = Category.builder()
+                            .name("Umum")
+                            .user(admin)
+                            .build();
+                    categoryRepository.save(category);
+                }
+            } else {
+                System.out.println("ADMIN ALREADY EXISTS: pinterq_admin");
+            }
+            
+            // Buat test_user jika belum ada
+            if (userRepository.findByUsername("test_user").isEmpty()) {
                 User testUser = User.builder()
                         .username("test_user")
                         .email("test@pinterq.com")
@@ -45,10 +55,10 @@ public class DataSeeder {
                         .approvalStatus(ApprovalStatus.APPROVED)
                         .build();
                 userRepository.save(testUser);
-                System.out.println("TEST USER DIBUAT: test_user / password123");
-
-                System.out.println("========== DATA DUMMY BERHASIL DITAMBAHKAN ==========");
+                System.out.println("TEST USER CREATED: test_user / password123");
             }
+
+            System.out.println("========== DATA SEEDING CHECK COMPLETED ==========");
         };
     }
 }
