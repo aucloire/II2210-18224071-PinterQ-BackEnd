@@ -5,9 +5,11 @@ import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.pinterq.backend.model.User;
@@ -40,15 +42,30 @@ public class UserController {
     public ResponseEntity<?> updateUserProfile(@PathVariable Long userId, @RequestBody ProfileUpdateRequest request) {
         return userRepository.findById(userId).map(user -> {
             if (request.getFullName() != null) user.setFullName(request.getFullName());
-            if (request.getUsername() != null) user.setUsername(request.getUsername());
             if (request.getProfileImageUrl() != null) user.setProfileImageUrl(request.getProfileImageUrl());
+            // Check username uniqueness
+            if (request.getUsername() != null) {
+                userRepository.findByUsername(request.getUsername()).ifPresent(existing -> {
+                    if (!existing.getId().equals(userId)) {
+                        throw new RuntimeException("Username sudah dipakai");
+                    }
+                });
+                user.setUsername(request.getUsername());
+            }
             userRepository.save(user);
             return ResponseEntity.ok(Map.of(
                 "message", "Profil berhasil diperbarui",
                 "fullName", user.getFullName(),
-                "profileImageUrl", user.getProfileImageUrl()
+                "username", user.getUsername(),
+                "profileImageUrl", user.getProfileImageUrl() != null ? user.getProfileImageUrl() : ""
             ));
         }).orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/check-username")
+    public ResponseEntity<?> checkUsername(@RequestBody UsernameCheckRequest request) {
+        boolean taken = userRepository.findByUsername(request.getUsername()).isPresent();
+        return ResponseEntity.ok(Map.of("available", !taken));
     }
 
     @Data
@@ -56,5 +73,10 @@ public class UserController {
         private String fullName;
         private String username;
         private String profileImageUrl;
+    }
+
+    @Data
+    static class UsernameCheckRequest {
+        private String username;
     }
 }

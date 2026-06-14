@@ -37,7 +37,7 @@ public class User {
     @Column(length = 150)
     private String fullName;
 
-    @Column(name = "profile_image_url")
+    @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
 
     @Column(name = "created_at", insertable = false, updatable = false)
