@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
 
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/categories")
 @RequiredArgsConstructor
+@CrossOrigin(origins = {"https://aucloire.stei.my.id", "http://localhost:5173"}, allowedHeaders = "*", allowCredentials = "true")
 public class CategoryController {
 
     private final CategoryRepository categoryRepository;
@@ -35,9 +37,7 @@ public class CategoryController {
 
     @GetMapping("/user/{userId}")
     public ResponseEntity<?> getUserCategories(@PathVariable Long userId) {
-        List<Category> categories = categoryRepository.findAll().stream()
-                .filter(c -> c.getUser().getId().equals(userId))
-                .toList();
+        List<Category> categories = categoryRepository.findByUser_Id(userId);
         return ResponseEntity.ok(categories);
     }
 
