@@ -53,7 +53,62 @@ public class StudyController {
 
         geminiAiService.generateStudyMaterials(request.getContent(), savedMaterial);
 
-        return ResponseEntity.ok("Materi sukses digenerate");
+        return ResponseEntity.ok(savedMaterial);
+    }
+
+    @PostMapping("/materials")
+    public ResponseEntity<?> createMaterial(@RequestBody GenerateRequest request) {
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        Category category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new RuntimeException("Category not found"));
+
+        Material material = Material.builder()
+                .user(user)
+                .title(request.getTitle())
+                .content(request.getContent())
+                .category(category)
+                .build();
+
+        return ResponseEntity.ok(materialRepository.save(material));
+    }
+
+    @PutMapping("/materials/{id}")
+    public ResponseEntity<?> updateMaterial(@PathVariable Long id, @RequestBody Map<String, String> updates) {
+        Material material = materialRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Material not found"));
+        if (updates.containsKey("title")) material.setTitle(updates.get("title"));
+        if (updates.containsKey("content")) material.setContent(updates.get("content"));
+        return ResponseEntity.ok(materialRepository.save(material));
+    }
+
+    @DeleteMapping("/materials/{id}")
+    public ResponseEntity<?> deleteMaterial(@PathVariable Long id) {
+        materialRepository.deleteById(id);
+        return ResponseEntity.ok("Materi dihapus");
+    }
+
+    @PostMapping("/quizzes")
+    public ResponseEntity<?> createQuiz(@RequestBody Map<String, Object> data) {
+        Material material = materialRepository.findById(Long.valueOf(data.get("materialId").toString()))
+                .orElseThrow(() -> new RuntimeException("Material not found"));
+        Quiz quiz = Quiz.builder()
+                .material(material)
+                .question(data.get("question").toString())
+                .optionA(data.get("optionA").toString())
+                .optionB(data.get("optionB").toString())
+                .optionC(data.get("optionC").toString())
+                .optionD(data.get("optionD").toString())
+                .correctAnswer(data.get("correctAnswer").toString())
+                .explanation(data.get("explanation") != null ? data.get("explanation").toString() : null)
+                .build();
+        return ResponseEntity.ok(quizRepository.save(quiz));
+    }
+
+    @DeleteMapping("/quizzes/{id}")
+    public ResponseEntity<?> deleteQuiz(@PathVariable Long id) {
+        quizRepository.deleteById(id);
+        return ResponseEntity.ok("Kuis dihapus");
     }
 
     @GetMapping("/flashcards/{categoryId}")
