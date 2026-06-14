@@ -15,8 +15,12 @@ public class DbMigrationRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         try {
-            jdbc.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'USER'");
-        } catch (Exception e) { /* column already exists */ }
+            // Fix legacy 'USER' role to 'MURID'
+            jdbc.execute("UPDATE users SET role = 'MURID' WHERE role = 'USER'");
+            System.out.println("[DBMigration] Fixed legacy USER roles to MURID.");
+        } catch (Exception e) {
+            System.out.println("[DBMigration] Legacy role fix skipped (column/issue may not exist): " + e.getMessage());
+        }
 
         try {
             jdbc.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT TRUE");
