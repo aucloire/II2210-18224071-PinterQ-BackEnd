@@ -23,7 +23,7 @@ public class NotificationService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         Notification notification = Notification.builder()
-                .userId(user)
+                .user(user)
                 .message(message)
                 .isRead(false)
                 .build();

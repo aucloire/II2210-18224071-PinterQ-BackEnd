@@ -20,16 +20,12 @@ public class NotificationController {
     @GetMapping
     public ResponseEntity<?> getNotifications(@RequestParam Long userId) {
         List<Notification> notifications = notificationService.getNotifications(userId);
-        int unread = notificationService.countUnread(userId);
-        return ResponseEntity.ok(Map.of(
-                "notifications", notifications.stream().map(n -> Map.of(
-                        "id", n.getId(),
-                        "message", n.getMessage(),
-                        "isRead", n.getIsRead(),
-                        "createdAt", n.getCreatedAt() != null ? n.getCreatedAt().toString() : ""
-                )).toList(),
-                "unreadCount", unread
-        ));
+        return ResponseEntity.ok(notifications.stream().map(n -> Map.of(
+                "id", n.getId(),
+                "message", n.getMessage(),
+                "isRead", n.getIsRead(),
+                "createdAt", n.getCreatedAt() != null ? n.getCreatedAt().toString() : ""
+        )).toList());
     }
 
     @PutMapping("/{notificationId}/read")
