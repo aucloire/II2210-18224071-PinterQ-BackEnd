@@ -44,7 +44,8 @@ public class StudyController {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+                .or(() -> categoryRepository.findByClassGroup_Id(request.getCategoryId()))
+                .orElseThrow(() -> new RuntimeException("Category or Class not found"));
 
         Material material = Material.builder()
                 .user(user)
@@ -64,8 +65,10 @@ public class StudyController {
     public ResponseEntity<?> createMaterial(@RequestBody GenerateRequest request) {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
+        
         Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+                .or(() -> categoryRepository.findByClassGroup_Id(request.getCategoryId()))
+                .orElseThrow(() -> new RuntimeException("Category or Class not found"));
 
         Material material = Material.builder()
                 .user(user)
@@ -136,17 +139,15 @@ public class StudyController {
 
     @GetMapping("/flashcards/{categoryId}")
     public ResponseEntity<?> getFlashcardsByCategory(@PathVariable Long categoryId) {
-        // Return flashcards that belong to the specified category OR class context
-        // FE will do final filtering by materialId, but BE should limit the scope
         var flashcards = flashcardRepository.findAll().stream()
                 .filter(f -> f.getMaterial() != null)
                 .filter(f -> {
                     Material m = f.getMaterial();
-                    // Matches category
-                    if (m.getCategory() != null && m.getCategory().getId().equals(categoryId)) return true;
-                    // If categoryId matches the material's parent structure (like a class)
-                    // we return it to ensure student class materials work
-                    return true; // Fallback to ensure visibility while FE filters
+                    if (m.getCategory() != null) {
+                        if (m.getCategory().getId().equals(categoryId)) return true;
+                        if (m.getCategory().getClassGroup() != null && m.getCategory().getClassGroup().getId().equals(categoryId)) return true;
+                    }
+                    return false;
                 })
                 .toList();
         return ResponseEntity.ok(flashcards);
@@ -156,6 +157,14 @@ public class StudyController {
     public ResponseEntity<?> getQuizzesByCategory(@PathVariable Long categoryId) {
         var quizzes = quizRepository.findAll().stream()
                 .filter(q -> q.getMaterial() != null)
+                .filter(q -> {
+                    Material m = q.getMaterial();
+                    if (m.getCategory() != null) {
+                        if (m.getCategory().getId().equals(categoryId)) return true;
+                        if (m.getCategory().getClassGroup() != null && m.getCategory().getClassGroup().getId().equals(categoryId)) return true;
+                    }
+                    return false;
+                })
                 .toList();
         return ResponseEntity.ok(quizzes);
     }
@@ -163,7 +172,8 @@ public class StudyController {
     @PostMapping("/generate-adaptive")
     public ResponseEntity<?> generateAdaptive(@RequestBody AdaptiveRequest request) {
         Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+                .or(() -> categoryRepository.findByClassGroup_Id(request.getCategoryId()))
+                .orElseThrow(() -> new RuntimeException("Category or Class not found"));
 
         Material latestMaterial = materialRepository.findAll().stream()
                 .filter(m -> m.getCategory() != null && m.getCategory().getId().equals(category.getId()))

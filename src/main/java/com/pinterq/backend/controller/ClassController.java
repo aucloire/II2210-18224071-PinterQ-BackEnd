@@ -17,6 +17,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.pinterq.backend.model.Category;
+import com.pinterq.backend.repository.CategoryRepository;
+
 @RestController
 @RequestMapping("/api/classes")
 @RequiredArgsConstructor
@@ -27,6 +30,7 @@ public class ClassController {
     private final ClassMemberRepository classMemberRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final CategoryRepository categoryRepository;
 
     @PostMapping
     public ResponseEntity<?> createClass(@RequestBody CreateClassRequest req) {
@@ -38,6 +42,14 @@ public class ClassController {
                 .teacher(teacher)
                 .build();
         classGroupRepository.save(cls);
+
+        // Auto-create category for class materials
+        Category classCat = Category.builder()
+                .name("Materi Kelas: " + cls.getName())
+                .user(teacher)
+                .classGroup(cls)
+                .build();
+        categoryRepository.save(classCat);
 
         return ResponseEntity.ok(Map.of(
                 "id", cls.getId(),
