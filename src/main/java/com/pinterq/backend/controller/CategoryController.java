@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/categories")
@@ -18,6 +19,16 @@ public class CategoryController {
 
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
+
+    @GetMapping("/public")
+    public ResponseEntity<?> getPublicCategories() {
+        List<Category> categories = categoryRepository.findAll();
+        return ResponseEntity.ok(categories.stream().map(c -> Map.of(
+            "id", c.getId(),
+            "name", c.getName(),
+            "createdAt", c.getCreatedAt() != null ? c.getCreatedAt().toString() : ""
+        )).toList());
+    }
 
     @GetMapping("/user/{userId}")
     public ResponseEntity<?> getUserCategories(@PathVariable Long userId) {

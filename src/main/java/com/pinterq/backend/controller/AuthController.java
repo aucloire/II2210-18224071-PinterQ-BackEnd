@@ -55,6 +55,7 @@ public class AuthController {
         return Jwts.builder()
                 .subject(String.valueOf(user.getId()))
                 .claim("username", user.getUsername())
+                .claim("fullName", user.getFullName() != null ? user.getFullName() : "")
                 .claim("role", user.getRole().name())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
@@ -71,23 +72,34 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "Email sudah dipakai"));
         }
 
-        // Default: USER role, PENDING approval
+        // Determine role: default to MURID if not specified or invalid
+        User.Role resolvedRole;
+        try {
+            resolvedRole = (request.getRole() != null && !request.getRole().isBlank())
+                    ? User.Role.valueOf(request.getRole().toUpperCase())
+                    : User.Role.MURID;
+        } catch (IllegalArgumentException e) {
+            resolvedRole = User.Role.MURID;
+        }
+        // Only GURU and MURID are allowed for regular registration
+        if (resolvedRole == User.Role.SUPERADMIN) {
+            resolvedRole = User.Role.MURID;
+        }
+
         User newUser = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(User.Role.USER)
+                .role(resolvedRole)
+                .fullName(request.getFullName() != null ? request.getFullName() : null)
                 .approvalStatus(User.ApprovalStatus.PENDING)
                 .build();
         userRepository.save(newUser);
 
-        String token = generateToken(newUser);
+        // Do NOT generate token — user must wait for approval
         return ResponseEntity.ok(Map.of(
-            "token", token,
-            "userId", newUser.getId(),
-            "username", newUser.getUsername(),
-            "role", newUser.getRole().name(),
-            "approvalStatus", newUser.getApprovalStatus().name()
+            "message", "Registrasi berhasil. Silakan tunggu persetujuan superadmin.",
+            "requiresApproval", true
         ));
     }
 
@@ -101,10 +113,10 @@ public class AuthController {
             return ResponseEntity.status(401).body(Map.of("error", "Username atau password salah"));
         }
         if (user.getApprovalStatus() == User.ApprovalStatus.PENDING) {
-            return ResponseEntity.status(403).body(Map.of("error", "Akun belum disetujui superadmin"));
+            return ResponseEntity.status(403).body(Map.of("error", "Akun Anda belum disetujui Admin"));
         }
         if (user.getApprovalStatus() == User.ApprovalStatus.REJECTED) {
-            return ResponseEntity.status(403).body(Map.of("error", "Registrasi ditolak"));
+            return ResponseEntity.status(403).body(Map.of("error", "Akun Anda ditolak Admin"));
         }
 
         String token = generateToken(user);
@@ -112,7 +124,9 @@ public class AuthController {
             "token", token,
             "userId", user.getId(),
             "username", user.getUsername(),
+            "fullName", user.getFullName() != null ? user.getFullName() : user.getUsername(),
             "role", user.getRole().name(),
+            "profileImageUrl", user.getProfileImageUrl() != null ? user.getProfileImageUrl() : "",
             "approvalStatus", user.getApprovalStatus().name()
         ));
     }
@@ -124,7 +138,9 @@ public class AuthController {
                     "id", u.getId(),
                     "username", u.getUsername(),
                     "email", u.getEmail(),
+                    "fullName", u.getFullName() != null ? u.getFullName() : "",
                     "role", u.getRole().name(),
+                    "profileImageUrl", u.getProfileImageUrl() != null ? u.getProfileImageUrl() : "",
                     "approvalStatus", u.getApprovalStatus().name(),
                     "createdAt", u.getCreatedAt() != null ? u.getCreatedAt().toString() : ""
                 ))
@@ -155,5 +171,7 @@ public class AuthController {
         private String username;
         private String email;
         private String password;
+        private String role;
+        private String fullName;
     }
 }

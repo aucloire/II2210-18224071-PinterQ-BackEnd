@@ -35,6 +35,7 @@ public class DataSeeder {
                         .email("admin@pinterq.com")
                         .passwordHash(passwordEncoder.encode("password123"))
                         .role(Role.SUPERADMIN)
+                        .fullName("Superadmin")
                         .approvalStatus(ApprovalStatus.APPROVED)
                         .build();
                 userRepository.save(admin);
@@ -43,6 +44,7 @@ public class DataSeeder {
                 admin = existingAdmin.get();
                 admin.setPasswordHash(passwordEncoder.encode("password123"));
                 admin.setRole(Role.SUPERADMIN);
+                admin.setFullName("Superadmin");
                 admin.setApprovalStatus(ApprovalStatus.APPROVED);
                 userRepository.save(admin);
                 System.out.println("ADMIN PASSWORD RESET: pinterq_admin / password123");

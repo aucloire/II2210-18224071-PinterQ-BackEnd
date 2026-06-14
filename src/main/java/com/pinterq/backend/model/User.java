@@ -27,18 +27,24 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private Role role = Role.USER;
+    private Role role = Role.MURID;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
     private ApprovalStatus approvalStatus = ApprovalStatus.PENDING;
 
+    @Column(length = 150)
+    private String fullName;
+
+    @Column(name = "profile_image_url")
+    private String profileImageUrl;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
     public enum Role {
-        SUPERADMIN, GURU, USER
+        SUPERADMIN, GURU, MURID
     }
 
     public enum ApprovalStatus {
