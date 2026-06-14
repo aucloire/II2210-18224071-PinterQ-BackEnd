@@ -25,10 +25,11 @@ import com.pinterq.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/api/teacher")
+@RequestMapping("/api/classes")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"https://aucloire.stei.my.id", "http://localhost:5173"}, allowedHeaders = "*", allowCredentials = "true")
+@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*", allowCredentials = "true")
 public class TeacherController {
+
 
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;

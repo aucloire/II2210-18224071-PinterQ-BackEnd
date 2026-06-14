@@ -18,7 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/categories")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"https://aucloire.stei.my.id", "http://localhost:5173"}, allowedHeaders = "*", allowCredentials = "true")
+@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*", allowCredentials = "true")
 public class CategoryController {
 
     private final CategoryRepository categoryRepository;
