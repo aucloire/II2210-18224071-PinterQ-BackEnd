@@ -69,6 +69,13 @@ public class GeminiAiService {
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
             System.out.println("Calling Gemini API: " + apiUrl);
+            // Log masked API key for debugging
+            if (apiKey != null && apiKey.length() > 8) {
+                System.out.println("Using API Key: " + apiKey.substring(0, 4) + "..." + apiKey.substring(apiKey.length() - 4));
+            } else {
+                System.out.println("API Key is missing or too short!");
+            }
+
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
@@ -76,6 +83,20 @@ public class GeminiAiService {
                 String aiResponseText = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
 
                 System.out.println("AI RAW RESPONSE: " + aiResponseText);
+
+                // Pre-processing: Remove markdown code blocks if present
+                if (aiResponseText.contains("```json")) {
+                    aiResponseText = aiResponseText.substring(aiResponseText.indexOf("```json") + 7);
+                    if (aiResponseText.contains("```")) {
+                        aiResponseText = aiResponseText.substring(0, aiResponseText.lastIndexOf("```"));
+                    }
+                } else if (aiResponseText.contains("```")) {
+                    aiResponseText = aiResponseText.substring(aiResponseText.indexOf("```") + 3);
+                    if (aiResponseText.contains("```")) {
+                        aiResponseText = aiResponseText.substring(0, aiResponseText.lastIndexOf("```"));
+                    }
+                }
+                aiResponseText = aiResponseText.trim();
 
                 // Parsing JSON dari AI
                 JsonNode resultJson = objectMapper.readTree(aiResponseText);
@@ -112,13 +133,15 @@ public class GeminiAiService {
                     }
                 }
             }
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            System.err.println("Gemini API HTTP Error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
         } catch (Exception e) {
             System.err.println("Error generating study materials: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    public void generateAdaptiveQuizzes(String textContent, com.pinterq.backend.model.Material savedMaterial, String difficulty) {
+    public void generateAdaptiveQuizzes(String textContent, Material savedMaterial, String difficulty) {
         try {
             String difficultyInstruction = "";
             if ("HOTS".equals(difficulty)) {
@@ -154,6 +177,11 @@ public class GeminiAiService {
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
             System.out.println("Calling Gemini API Adaptive: " + apiUrl);
+            // Log masked API key for debugging
+            if (apiKey != null && apiKey.length() > 8) {
+                System.out.println("Using API Key: " + apiKey.substring(0, 4) + "..." + apiKey.substring(apiKey.length() - 4));
+            }
+
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
@@ -162,12 +190,26 @@ public class GeminiAiService {
                 
                 System.out.println("AI ADAPTIVE RAW RESPONSE: " + aiResponseText);
 
+                // Pre-processing: Remove markdown code blocks if present
+                if (aiResponseText.contains("```json")) {
+                    aiResponseText = aiResponseText.substring(aiResponseText.indexOf("```json") + 7);
+                    if (aiResponseText.contains("```")) {
+                        aiResponseText = aiResponseText.substring(0, aiResponseText.lastIndexOf("```"));
+                    }
+                } else if (aiResponseText.contains("```")) {
+                    aiResponseText = aiResponseText.substring(aiResponseText.indexOf("```") + 3);
+                    if (aiResponseText.contains("```")) {
+                        aiResponseText = aiResponseText.substring(0, aiResponseText.lastIndexOf("```"));
+                    }
+                }
+                aiResponseText = aiResponseText.trim();
+
                 JsonNode resultJson = objectMapper.readTree(aiResponseText);
                 JsonNode quizzesNode = resultJson.path("quizzes");
                 
                 if (quizzesNode.isArray()) {
                     for (JsonNode node : quizzesNode) {
-                        com.pinterq.backend.model.Quiz quiz = com.pinterq.backend.model.Quiz.builder()
+                        Quiz quiz = Quiz.builder()
                                 .question(node.path("question").asText())
                                 .optionA(node.path("optionA").asText())
                                 .optionB(node.path("optionB").asText())
@@ -183,25 +225,6 @@ public class GeminiAiService {
             }
         } catch (org.springframework.web.client.HttpStatusCodeException e) {
             System.err.println("Gemini API Adaptive HTTP Error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
-        } catch (Exception e) {
-            System.err.println("Error generating adaptive quizzes: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-}
-            .question(node.path("question").asText())
-                                .optionA(node.path("optionA").asText())
-                                .optionB(node.path("optionB").asText())
-                                .optionC(node.path("optionC").asText())
-                                .optionD(node.path("optionD").asText())
-                                .correctAnswer(node.path("correctAnswer").asText())
-                                .explanation(node.path("explanation").asText())
-                                .material(savedMaterial)
-                                .build();
-                        quizRepository.save(quiz);
-                    }
-                }
-            }
         } catch (Exception e) {
             System.err.println("Error generating adaptive quizzes: " + e.getMessage());
             e.printStackTrace();
