@@ -1,8 +1,10 @@
 package com.pinterq.backend.controller;
 
 import com.pinterq.backend.model.Category;
+import com.pinterq.backend.model.ClassGroup;
 import com.pinterq.backend.model.User;
 import com.pinterq.backend.repository.CategoryRepository;
+import com.pinterq.backend.repository.ClassGroupRepository;
 import com.pinterq.backend.repository.UserRepository;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ public class CategoryController {
 
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
+    private final ClassGroupRepository classGroupRepository;
 
     @GetMapping("/public")
     public ResponseEntity<?> getPublicCategories() {
@@ -42,18 +45,30 @@ public class CategoryController {
     public ResponseEntity<?> createCategory(@RequestBody CategoryRequest request) {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        
+
         Category newCategory = Category.builder()
                 .name(request.getName())
                 .user(user)
+                .classGroup(resolveClass(request.getClassId()))
                 .build();
         categoryRepository.save(newCategory);
-        return ResponseEntity.ok(newCategory);
+
+        return ResponseEntity.ok(Map.of(
+                "id", newCategory.getId(),
+                "name", newCategory.getName(),
+                "classId", request.getClassId()
+        ));
+    }
+
+    private ClassGroup resolveClass(Long classId) {
+        if (classId == null) return null;
+        return classGroupRepository.findById(classId).orElse(null);
     }
 
     @Data
     static class CategoryRequest {
         private Long userId;
         private String name;
+        private Long classId;
     }
 }
