@@ -19,11 +19,12 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
 
-    public Notification createNotification(Long userId, String message) {
+    public Notification createNotification(Long userId, String title, String message) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         Notification notification = Notification.builder()
                 .user(user)
+                .title(title)
                 .message(message)
                 .isRead(false)
                 .build();
@@ -45,19 +46,33 @@ public class NotificationService {
         return notificationRepository.findByUserIdAndIsRead(userId, false).size();
     }
 
-    // Convenience methods for triggering notifications in class workflows
-    public void notifyTeacherOnJoin(Long teacherId, String studentName, String className) {
-        createNotification(teacherId, "Murid " + studentName + " bergabung ke kelas " + className);
+    // --- AUTOMATED NOTIFICATION TRIGGERS ---
+
+    public void notifyAdminsOnRegistration(String username) {
+        userRepository.findAll().stream()
+            .filter(u -> u.getRole() == User.Role.SUPERADMIN)
+            .forEach(admin -> {
+                createNotification(admin.getId(), "User Baru", "User @" + username + " baru saja mendaftar dan menunggu persetujuan.");
+            });
     }
 
-    public void notifyStudentsOnNewQuiz(ClassGroup classGroup, String studentName) {
-        String msg = "Materi baru di kelas " + classGroup.getName();
-        for (ClassMember cm : classGroup.getMembers()) {
-            try {
-                createNotification(cm.getUser().getId(), msg);
-            } catch (Exception e) {
-                // skip if user not found
+    public void notifyTeacherOnJoin(Long teacherId, String studentName, String className) {
+        createNotification(teacherId, "Murid Bergabung", "Murid " + studentName + " bergabung ke kelas " + className);
+    }
+
+    public void notifyStudentsOnNewMaterial(ClassGroup classGroup, String materialTitle) {
+        String title = "Materi Baru";
+        String msg = "Guru telah merilis materi baru: \"" + materialTitle + "\" di kelas " + classGroup.getName();
+        if (classGroup.getMembers() != null) {
+            for (ClassMember cm : classGroup.getMembers()) {
+                try {
+                    createNotification(cm.getUser().getId(), title, msg);
+                } catch (Exception e) {}
             }
         }
+    }
+
+    public void notifyUserOnGenerationComplete(Long userId, String materialTitle) {
+        createNotification(userId, "AI Selesai", "Generate AI untuk materi \"" + materialTitle + "\" telah selesai.");
     }
 }

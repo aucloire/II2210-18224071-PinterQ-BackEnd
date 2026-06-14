@@ -24,6 +24,7 @@ public class GeminiAiService {
     private final QuizRepository quizRepository;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final com.pinterq.backend.service.NotificationService notificationService;
 
     @Value("${gemini.api.url}")
     private String apiUrl;
@@ -31,9 +32,10 @@ public class GeminiAiService {
     @Value("${GEMINI_API_KEY:${gemini.api.key}}")
     private String apiKey;
 
-    public GeminiAiService(FlashcardRepository flashcardRepository, QuizRepository quizRepository) {
+    public GeminiAiService(FlashcardRepository flashcardRepository, QuizRepository quizRepository, com.pinterq.backend.service.NotificationService notificationService) {
         this.flashcardRepository = flashcardRepository;
         this.quizRepository = quizRepository;
+        this.notificationService = notificationService;
         this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
     }
@@ -137,6 +139,12 @@ public class GeminiAiService {
                         }
                     }
                     System.out.println("AI Generation Successful for Material: " + savedMaterial.getTitle());
+                    
+                    // Trigger notification
+                    try {
+                        notificationService.notifyUserOnGenerationComplete(savedMaterial.getUser().getId(), savedMaterial.getTitle());
+                    } catch (Exception e) {}
+                    
                     return; // Success, exit method
                 }
             } catch (org.springframework.web.client.HttpStatusCodeException e) {

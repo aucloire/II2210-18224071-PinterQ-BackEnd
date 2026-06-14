@@ -36,6 +36,7 @@ public class AuthController {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.pinterq.backend.service.NotificationService notificationService;
 
     @GetMapping("/ping")
     public ResponseEntity<?> ping() {
@@ -97,6 +98,11 @@ public class AuthController {
                 .approvalStatus(User.ApprovalStatus.PENDING)
                 .build();
         userRepository.save(newUser);
+
+        // Notify Admins
+        try {
+            notificationService.notifyAdminsOnRegistration(newUser.getUsername());
+        } catch (Exception e) {}
 
         // Do NOT generate token — user must wait for approval
         return ResponseEntity.ok(Map.of(

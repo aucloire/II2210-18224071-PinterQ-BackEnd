@@ -37,6 +37,7 @@ public class StudyController {
     private final FlashcardRepository flashcardRepository;
     private final QuizRepository quizRepository;
     private final QuizAttemptRepository quizAttemptRepository;
+    private final com.pinterq.backend.service.NotificationService notificationService;
 
     @GetMapping("/test-ai")
     public ResponseEntity<?> testAi() {
@@ -71,6 +72,13 @@ public class StudyController {
 
             Material savedMaterial = materialRepository.save(material);
             System.out.println("Saved Material ID: " + savedMaterial.getId());
+
+            // Notify students if part of a class
+            try {
+                if (category.getClassGroup() != null) {
+                    notificationService.notifyStudentsOnNewMaterial(category.getClassGroup(), savedMaterial.getTitle());
+                }
+            } catch (Exception e) {}
 
             geminiAiService.generateStudyMaterials(request.getContent(), savedMaterial);
             System.out.println("AI Task handed over to service (Async)");

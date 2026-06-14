@@ -42,31 +42,33 @@ public class UserController {
 
     @PutMapping("/{userId}")
     public ResponseEntity<?> updateUserProfile(@PathVariable Long userId, @RequestBody ProfileUpdateRequest request) {
-        return userRepository.findById(userId).map(user -> {
-            if (request.getFullName() != null) user.setFullName(request.getFullName());
-            if (request.getProfileImageUrl() != null) user.setProfileImageUrl(request.getProfileImageUrl());
-            // Check username uniqueness
-            if (request.getUsername() != null) {
-                userRepository.findByUsername(request.getUsername()).ifPresent(existing -> {
-                    if (!existing.getId().equals(userId)) {
-                        throw new RuntimeException("Username sudah dipakai");
-                    }
-                });
-                user.setUsername(request.getUsername());
-            }
-            userRepository.save(user);
-            return ResponseEntity.ok(Map.of(
-                "message", "Profil berhasil diperbarui",
-                "fullName", user.getFullName(),
-                "username", user.getUsername(),
-                "profileImageUrl", user.getProfileImageUrl() != null ? user.getProfileImageUrl() : ""
-            ));
-        }).orElse(ResponseEntity.notFound().build());
+        try {
+            return userRepository.findById(userId).map(user -> {
+                if (request.getFullName() != null) user.setFullName(request.getFullName());
+                if (request.getProfileImageUrl() != null) user.setProfileImageUrl(request.getProfileImageUrl());
+                // Check username uniqueness
+                if (request.getUsername() != null && !request.getUsername().equals(user.getUsername())) {
+                    userRepository.findByUsername(request.getUsername()).ifPresent(existing -> {
+                        throw new RuntimeException("Username '" + request.getUsername() + "' sudah dipakai");
+                    });
+                    user.setUsername(request.getUsername());
+                }
+                userRepository.save(user);
+                return ResponseEntity.ok(Map.of(
+                    "message", "Profil berhasil diperbarui",
+                    "fullName", user.getFullName(),
+                    "username", user.getUsername(),
+                    "profileImageUrl", user.getProfileImageUrl() != null ? user.getProfileImageUrl() : ""
+                ));
+            }).orElse(ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
     }
 
-    @PostMapping("/check-username")
-    public ResponseEntity<?> checkUsername(@RequestBody UsernameCheckRequest request) {
-        boolean taken = userRepository.findByUsername(request.getUsername()).isPresent();
+    @GetMapping("/check-username")
+    public ResponseEntity<?> checkUsername(@RequestParam String username) {
+        boolean taken = userRepository.findByUsername(username).isPresent();
         return ResponseEntity.ok(Map.of("available", !taken));
     }
 
