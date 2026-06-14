@@ -181,6 +181,27 @@ public class GeminiAiService {
                     }
                 }
             }
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            System.err.println("Gemini API Adaptive HTTP Error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
+        } catch (Exception e) {
+            System.err.println("Error generating adaptive quizzes: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+}
+            .question(node.path("question").asText())
+                                .optionA(node.path("optionA").asText())
+                                .optionB(node.path("optionB").asText())
+                                .optionC(node.path("optionC").asText())
+                                .optionD(node.path("optionD").asText())
+                                .correctAnswer(node.path("correctAnswer").asText())
+                                .explanation(node.path("explanation").asText())
+                                .material(savedMaterial)
+                                .build();
+                        quizRepository.save(quiz);
+                    }
+                }
+            }
         } catch (Exception e) {
             System.err.println("Error generating adaptive quizzes: " + e.getMessage());
             e.printStackTrace();
