@@ -1,7 +1,9 @@
 package com.pinterq.backend.controller;
 
 import com.pinterq.backend.model.Category;
+import com.pinterq.backend.model.Flashcard;
 import com.pinterq.backend.model.Material;
+import com.pinterq.backend.model.Quiz;
 import com.pinterq.backend.model.QuizAttempt;
 import com.pinterq.backend.model.User;
 import com.pinterq.backend.repository.CategoryRepository;
@@ -109,6 +111,25 @@ public class StudyController {
     public ResponseEntity<?> deleteQuiz(@PathVariable Long id) {
         quizRepository.deleteById(id);
         return ResponseEntity.ok("Kuis dihapus");
+    }
+
+    @PostMapping("/flashcards")
+    public ResponseEntity<?> createFlashcard(@RequestBody Map<String, Object> data) {
+        Material material = materialRepository.findById(Long.valueOf(data.get("materialId").toString()))
+                .orElseThrow(() -> new RuntimeException("Material not found"));
+        Flashcard flashcard = Flashcard.builder()
+                .material(material)
+                .question(data.get("question").toString())
+                .answer(data.get("answer").toString())
+                .isMemorized(false)
+                .build();
+        return ResponseEntity.ok(flashcardRepository.save(flashcard));
+    }
+
+    @DeleteMapping("/flashcards/{id}")
+    public ResponseEntity<?> deleteFlashcard(@PathVariable Long id) {
+        flashcardRepository.deleteById(id);
+        return ResponseEntity.ok("Flashcard dihapus");
     }
 
     @GetMapping("/flashcards/{categoryId}")
