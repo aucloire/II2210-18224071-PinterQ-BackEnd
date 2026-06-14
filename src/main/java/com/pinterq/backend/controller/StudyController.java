@@ -27,7 +27,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/study")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"https://aucloire.stei.my.id", "http://localhost:5173"}, allowedHeaders = "*", allowCredentials = "true")
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class StudyController {
 
     private final GeminiAiService geminiAiService;
@@ -38,27 +38,49 @@ public class StudyController {
     private final QuizRepository quizRepository;
     private final QuizAttemptRepository quizAttemptRepository;
 
+    @GetMapping("/test-ai")
+    public ResponseEntity<?> testAi() {
+        try {
+            Material testMaterial = Material.builder().title("Test").content("Test content").build();
+            geminiAiService.generateStudyMaterials("Apa itu Cloud Computing?", testMaterial);
+            return ResponseEntity.ok("AI request triggered. Check backend logs!");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
     @PostMapping("/generate")
     public ResponseEntity<?> generate(@RequestBody GenerateRequest request) {
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        System.out.println(">>> RECEIVED GENERATE REQUEST: " + request);
+        try {
+            User user = userRepository.findById(request.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found: " + request.getUserId()));
 
-        Category category = categoryRepository.findById(request.getCategoryId())
-                .or(() -> categoryRepository.findByClassGroup_Id(request.getCategoryId()))
-                .orElseThrow(() -> new RuntimeException("Category or Class not found"));
+            Category category = categoryRepository.findById(request.getCategoryId())
+                    .or(() -> categoryRepository.findByClassGroup_Id(request.getCategoryId()))
+                    .orElseThrow(() -> new RuntimeException("Category/Class not found: " + request.getCategoryId()));
 
-        Material material = Material.builder()
-                .user(user)
-                .title(request.getTitle())
-                .content(request.getContent())
-                .category(category)
-                .build();
+            System.out.println("Found User: " + user.getUsername() + ", Category: " + category.getName());
 
-        Material savedMaterial = materialRepository.save(material);
+            Material material = Material.builder()
+                    .user(user)
+                    .title(request.getTitle())
+                    .content(request.getContent())
+                    .category(category)
+                    .build();
 
-        geminiAiService.generateStudyMaterials(request.getContent(), savedMaterial);
+            Material savedMaterial = materialRepository.save(material);
+            System.out.println("Saved Material ID: " + savedMaterial.getId());
 
-        return ResponseEntity.ok(savedMaterial);
+            geminiAiService.generateStudyMaterials(request.getContent(), savedMaterial);
+            System.out.println("AI Task handed over to service (Async)");
+
+            return ResponseEntity.ok(savedMaterial);
+        } catch (Exception e) {
+            System.err.println("GENERATE ERROR: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Internal Error: " + e.getMessage());
+        }
     }
 
     @PostMapping("/materials")
