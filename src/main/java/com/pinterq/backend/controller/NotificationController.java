@@ -21,13 +21,21 @@ public class NotificationController {
 
     @GetMapping
     public ResponseEntity<?> getNotifications(@RequestParam Long userId) {
-        List<Notification> notifications = notificationService.getNotifications(userId);
-        return ResponseEntity.ok(notifications.stream().map(n -> Map.of(
-                "id", n.getId(),
-                "message", n.getMessage(),
-                "isRead", n.getIsRead(),
-                "createdAt", n.getCreatedAt() != null ? n.getCreatedAt().toString() : ""
-        )).toList());
+        try {
+            List<Notification> notifications = notificationService.getNotifications(userId);
+            List<Map<String, Object>> response = notifications.stream().map(n -> {
+                Map<String, Object> map = new HashMap<>();
+                map.put("id", n.getId());
+                map.put("message", n.getMessage() != null ? n.getMessage() : "");
+                map.put("isRead", n.getIsRead() != null ? n.getIsRead() : false);
+                map.put("createdAt", n.getCreatedAt() != null ? n.getCreatedAt().toString() : "");
+                return map;
+            }).toList();
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
     }
 
     @PutMapping("/{notificationId}/read")

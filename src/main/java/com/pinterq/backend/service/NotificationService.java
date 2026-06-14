@@ -31,7 +31,7 @@ public class NotificationService {
     }
 
     public List<Notification> getNotifications(Long userId) {
-        return notificationRepository.findByUser_IdOrderByCreatedAtDesc(userId);
+        return notificationRepository.findByUserId(userId);
     }
 
     public Notification markRead(Long notificationId) {
@@ -42,7 +42,7 @@ public class NotificationService {
     }
 
     public int countUnread(Long userId) {
-        return (int) notificationRepository.findByUser_IdAndIsReadOrderByCreatedAtDesc(userId, false).stream().count();
+        return notificationRepository.findByUserIdAndIsRead(userId, false).size();
     }
 
     // Convenience methods for triggering notifications in class workflows
