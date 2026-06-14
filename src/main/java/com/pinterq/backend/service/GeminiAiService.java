@@ -27,7 +27,7 @@ public class GeminiAiService {
     @Value("${gemini.api.url}")
     private String apiUrl;
 
-    @Value("${gemini.api.key}")
+    @Value("${GEMINI_API_KEY:${gemini.api.key}}")
     private String apiKey;
 
     public GeminiAiService(FlashcardRepository flashcardRepository, QuizRepository quizRepository) {
@@ -54,8 +54,13 @@ public class GeminiAiService {
             Map<String, Object> content = new HashMap<>();
             content.put("parts", List.of(part));
 
+            // Modern Gemini API config for JSON
+            Map<String, Object> generationConfig = new HashMap<>();
+            generationConfig.put("response_mime_type", "application/json");
+
             Map<String, Object> body = new HashMap<>();
             body.put("contents", List.of(content));
+            body.put("generationConfig", generationConfig);
 
             // HTTP POST
             String url = apiUrl + "?key=" + apiKey;
@@ -63,6 +68,7 @@ public class GeminiAiService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
+            System.out.println("Calling Gemini API: " + apiUrl);
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
@@ -70,13 +76,6 @@ public class GeminiAiService {
                 String aiResponseText = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
 
                 System.out.println("AI RAW RESPONSE: " + aiResponseText);
-
-                // Cleaning more robustly: find first { and last }
-                int firstBrace = aiResponseText.indexOf("{");
-                int lastBrace = aiResponseText.lastIndexOf("}");
-                if (firstBrace != -1 && lastBrace != -1) {
-                    aiResponseText = aiResponseText.substring(firstBrace, lastBrace + 1);
-                }
 
                 // Parsing JSON dari AI
                 JsonNode resultJson = objectMapper.readTree(aiResponseText);
@@ -141,14 +140,20 @@ public class GeminiAiService {
             Map<String, Object> content = new HashMap<>();
             content.put("parts", List.of(part));
 
+            // Modern Gemini API config for JSON
+            Map<String, Object> generationConfig = new HashMap<>();
+            generationConfig.put("response_mime_type", "application/json");
+
             Map<String, Object> body = new HashMap<>();
             body.put("contents", List.of(content));
+            body.put("generationConfig", generationConfig);
 
             String url = apiUrl + "?key=" + apiKey;
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
+            System.out.println("Calling Gemini API Adaptive: " + apiUrl);
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
@@ -157,12 +162,6 @@ public class GeminiAiService {
                 
                 System.out.println("AI ADAPTIVE RAW RESPONSE: " + aiResponseText);
 
-                int firstBrace = aiResponseText.indexOf("{");
-                int lastBrace = aiResponseText.lastIndexOf("}");
-                if (firstBrace != -1 && lastBrace != -1) {
-                    aiResponseText = aiResponseText.substring(firstBrace, lastBrace + 1);
-                }
-                
                 JsonNode resultJson = objectMapper.readTree(aiResponseText);
                 JsonNode quizzesNode = resultJson.path("quizzes");
                 
