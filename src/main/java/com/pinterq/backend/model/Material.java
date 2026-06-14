@@ -32,4 +32,10 @@ public class Material {
 
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "material", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Flashcard> flashcards;
+
+    @OneToMany(mappedBy = "material", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Quiz> quizzes;
 }

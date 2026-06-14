@@ -40,107 +40,127 @@ public class GeminiAiService {
 
     @Async
     public void generateStudyMaterials(String textContent, Material savedMaterial) {
-        try {
-            String prompt = "Berdasarkan teks berikut, ekstrak informasi penting dan buatkan flashcards (pertanyaan dan jawaban singkat) " +
-                    "serta soal kuis pilihan ganda yang komprehensif. Jumlah flashcard dan kuis menyesuaikan dengan kepadatan materi, buatlah seakurat dan sebanyak yang diperlukan. " +
-                    "ATURAN PENJELASAN KUIS: Penjelasan (explanation) HARUS bersifat mandiri, komprehensif, dan bergaya seperti guru yang sedang mengajar langsung. DILARANG KERAS menggunakan kata-kata seperti 'Berdasarkan teks...', 'Pada teks dijelaskan...', atau 'Teks menyebutkan...'. " +
-                    "Kembalikan HANYA dalam format JSON murni tanpa markdown (tanpa ```json). " +
-                    "Struktur: {\"flashcards\": [{\"question\": \"...\", \"answer\": \"...\"}], " +
-                    "\"quizzes\": [{\"question\": \"...\", \"optionA\": \"...\", \"optionB\": \"...\", \"optionC\": \"...\", \"optionD\": \"...\", \"correctAnswer\": \"A\", \"explanation\": \"...\"}]} " +
-                    "Teks: " + textContent;
+        int maxRetries = 3;
+        int retryCount = 0;
+        
+        while (retryCount < maxRetries) {
+            try {
+                String prompt = "Berdasarkan teks berikut, ekstrak informasi penting dan buatkan flashcards (pertanyaan dan jawaban singkat) " +
+                        "serta soal kuis pilihan ganda yang komprehensif. Jumlah flashcard dan kuis menyesuaikan dengan kepadatan materi, buatlah seakurat dan sebanyak yang diperlukan. " +
+                        "ATURAN PENJELASAN KUIS: Penjelasan (explanation) HARUS bersifat mandiri, komprehensif, dan bergaya seperti guru yang sedang mengajar langsung. DILARANG KERAS menggunakan kata-kata seperti 'Berdasarkan teks...', 'Pada teks dijelaskan...', atau 'Teks menyebutkan...'. " +
+                        "Kembalikan HANYA dalam format JSON murni tanpa markdown (tanpa ```json). " +
+                        "Struktur: {\"flashcards\": [{\"question\": \"...\", \"answer\": \"...\"}], " +
+                        "\"quizzes\": [{\"question\": \"...\", \"optionA\": \"...\", \"optionB\": \"...\", \"optionC\": \"...\", \"optionD\": \"...\", \"correctAnswer\": \"A\", \"explanation\": \"...\"}]} " +
+                        "Teks: " + textContent;
 
-            // Body request Gemini API
-            Map<String, Object> part = new HashMap<>();
-            part.put("text", prompt);
+                // Body request Gemini API
+                Map<String, Object> part = new HashMap<>();
+                part.put("text", prompt);
 
-            Map<String, Object> content = new HashMap<>();
-            content.put("parts", List.of(part));
+                Map<String, Object> content = new HashMap<>();
+                content.put("parts", List.of(part));
 
-            // Modern Gemini API config for JSON
-            Map<String, Object> generationConfig = new HashMap<>();
-            generationConfig.put("response_mime_type", "application/json");
+                // Modern Gemini API config for JSON
+                Map<String, Object> generationConfig = new HashMap<>();
+                generationConfig.put("response_mime_type", "application/json");
 
-            Map<String, Object> body = new HashMap<>();
-            body.put("contents", List.of(content));
-            body.put("generationConfig", generationConfig);
+                Map<String, Object> body = new HashMap<>();
+                body.put("contents", List.of(content));
+                body.put("generationConfig", generationConfig);
 
-            // HTTP POST
-            String url = apiUrl + "?key=" + apiKey;
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+                // HTTP POST
+                String url = apiUrl + "?key=" + apiKey;
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+                HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
-            System.out.println("Calling Gemini API: " + apiUrl);
-            // Log masked API key for debugging
-            if (apiKey != null && apiKey.length() > 8) {
-                System.out.println("Using API Key: " + apiKey.substring(0, 4) + "..." + apiKey.substring(apiKey.length() - 4));
-            } else {
-                System.out.println("API Key is missing or too short!");
+                System.out.println("Calling Gemini API (Attempt " + (retryCount + 1) + "): " + apiUrl);
+                // Log masked API key for debugging
+                if (apiKey != null && apiKey.length() > 8) {
+                    System.out.println("Using API Key: " + apiKey.substring(0, 4) + "..." + apiKey.substring(apiKey.length() - 4));
+                }
+
+                ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+
+                if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                    JsonNode root = objectMapper.readTree(response.getBody());
+                    String aiResponseText = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
+
+                    System.out.println("AI RAW RESPONSE: " + aiResponseText);
+
+                    // Pre-processing: Remove markdown code blocks if present
+                    if (aiResponseText.contains("```json")) {
+                        aiResponseText = aiResponseText.substring(aiResponseText.indexOf("```json") + 7);
+                        if (aiResponseText.contains("```")) {
+                            aiResponseText = aiResponseText.substring(0, aiResponseText.lastIndexOf("```"));
+                        }
+                    } else if (aiResponseText.contains("```")) {
+                        aiResponseText = aiResponseText.substring(aiResponseText.indexOf("```") + 3);
+                        if (aiResponseText.contains("```")) {
+                            aiResponseText = aiResponseText.substring(0, aiResponseText.lastIndexOf("```"));
+                        }
+                    }
+                    aiResponseText = aiResponseText.trim();
+
+                    // Parsing JSON dari AI
+                    JsonNode resultJson = objectMapper.readTree(aiResponseText);
+
+                    // Simpan Flashcards
+                    JsonNode flashcardsNode = resultJson.path("flashcards");
+                    if (flashcardsNode.isArray()) {
+                        for (JsonNode node : flashcardsNode) {
+                            Flashcard flashcard = Flashcard.builder()
+                                    .question(node.path("question").asText())
+                                    .answer(node.path("answer").asText())
+                                    .material(savedMaterial)
+                                    .isMemorized(false)
+                                    .build();
+                            flashcardRepository.save(flashcard);
+                        }
+                    }
+
+                    // Simpan Quizzes
+                    JsonNode quizzesNode = resultJson.path("quizzes");
+                    if (quizzesNode.isArray()) {
+                        for (JsonNode node : quizzesNode) {
+                            Quiz quiz = Quiz.builder()
+                                    .question(node.path("question").asText())
+                                    .optionA(node.path("optionA").asText())
+                                    .optionB(node.path("optionB").asText())
+                                    .optionC(node.path("optionC").asText())
+                                    .optionD(node.path("optionD").asText())
+                                    .correctAnswer(node.path("correctAnswer").asText())
+                                    .explanation(node.path("explanation").asText())
+                                    .material(savedMaterial)
+                                    .build();
+                            quizRepository.save(quiz);
+                        }
+                    }
+                    System.out.println("AI Generation Successful for Material: " + savedMaterial.getTitle());
+                    return; // Success, exit method
+                }
+            } catch (org.springframework.web.client.HttpStatusCodeException e) {
+                System.err.println("Gemini API Error (Attempt " + (retryCount + 1) + "): " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
+                if (e.getStatusCode().value() == 503 || e.getStatusCode().value() == 429) {
+                    retryCount++;
+                    if (retryCount < maxRetries) {
+                        try {
+                            System.out.println("Retrying in 5 seconds...");
+                            Thread.sleep(5000); // Wait 5s before retry
+                            continue;
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                }
+                break; // Other HTTP errors, don't retry
+            } catch (Exception e) {
+                System.err.println("Error generating study materials: " + e.getMessage());
+                e.printStackTrace();
+                break;
             }
-
-            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
-
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                JsonNode root = objectMapper.readTree(response.getBody());
-                String aiResponseText = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
-
-                System.out.println("AI RAW RESPONSE: " + aiResponseText);
-
-                // Pre-processing: Remove markdown code blocks if present
-                if (aiResponseText.contains("```json")) {
-                    aiResponseText = aiResponseText.substring(aiResponseText.indexOf("```json") + 7);
-                    if (aiResponseText.contains("```")) {
-                        aiResponseText = aiResponseText.substring(0, aiResponseText.lastIndexOf("```"));
-                    }
-                } else if (aiResponseText.contains("```")) {
-                    aiResponseText = aiResponseText.substring(aiResponseText.indexOf("```") + 3);
-                    if (aiResponseText.contains("```")) {
-                        aiResponseText = aiResponseText.substring(0, aiResponseText.lastIndexOf("```"));
-                    }
-                }
-                aiResponseText = aiResponseText.trim();
-
-                // Parsing JSON dari AI
-                JsonNode resultJson = objectMapper.readTree(aiResponseText);
-
-                // Simpan Flashcards
-                JsonNode flashcardsNode = resultJson.path("flashcards");
-                if (flashcardsNode.isArray()) {
-                    for (JsonNode node : flashcardsNode) {
-                        Flashcard flashcard = Flashcard.builder()
-                                .question(node.path("question").asText())
-                                .answer(node.path("answer").asText())
-                                .material(savedMaterial)
-                                .isMemorized(false)
-                                .build();
-                        flashcardRepository.save(flashcard);
-                    }
-                }
-
-                // Simpan Quizzes
-                JsonNode quizzesNode = resultJson.path("quizzes");
-                if (quizzesNode.isArray()) {
-                    for (JsonNode node : quizzesNode) {
-                        Quiz quiz = Quiz.builder()
-                                .question(node.path("question").asText())
-                                .optionA(node.path("optionA").asText())
-                                .optionB(node.path("optionB").asText())
-                                .optionC(node.path("optionC").asText())
-                                .optionD(node.path("optionD").asText())
-                                .correctAnswer(node.path("correctAnswer").asText())
-                                .explanation(node.path("explanation").asText())
-                                .material(savedMaterial)
-                                .build();
-                        quizRepository.save(quiz);
-                    }
-                }
-            }
-        } catch (org.springframework.web.client.HttpStatusCodeException e) {
-            System.err.println("Gemini API HTTP Error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
-        } catch (Exception e) {
-            System.err.println("Error generating study materials: " + e.getMessage());
-            e.printStackTrace();
         }
+        System.err.println("AI Generation FAILED after " + retryCount + " retries for Material: " + savedMaterial.getTitle());
     }
 
     @Async
