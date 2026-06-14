@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
+import org.springframework.scheduling.annotation.Async;
 
 import java.util.HashMap;
 import java.util.List;
@@ -37,6 +38,7 @@ public class GeminiAiService {
         this.objectMapper = new ObjectMapper();
     }
 
+    @Async
     public void generateStudyMaterials(String textContent, Material savedMaterial) {
         try {
             String prompt = "Berdasarkan teks berikut, ekstrak informasi penting dan buatkan flashcards (pertanyaan dan jawaban singkat) " +
@@ -141,6 +143,7 @@ public class GeminiAiService {
         }
     }
 
+    @Async
     public void generateAdaptiveQuizzes(String textContent, Material savedMaterial, String difficulty) {
         try {
             String difficultyInstruction = "";

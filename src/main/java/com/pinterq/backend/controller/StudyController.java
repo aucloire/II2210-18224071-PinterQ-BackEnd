@@ -169,6 +169,19 @@ public class StudyController {
         return ResponseEntity.ok(quizzes);
     }
 
+    @GetMapping("/materials/{categoryId}")
+    public ResponseEntity<?> getMaterialsByCategory(@PathVariable Long categoryId) {
+        var materials = materialRepository.findAll().stream()
+                .filter(m -> m.getCategory() != null)
+                .filter(m -> {
+                    if (m.getCategory().getId().equals(categoryId)) return true;
+                    if (m.getCategory().getClassGroup() != null && m.getCategory().getClassGroup().getId().equals(categoryId)) return true;
+                    return false;
+                })
+                .toList();
+        return ResponseEntity.ok(materials);
+    }
+
     @PostMapping("/generate-adaptive")
     public ResponseEntity<?> generateAdaptive(@RequestBody AdaptiveRequest request) {
         Category category = categoryRepository.findById(request.getCategoryId())
