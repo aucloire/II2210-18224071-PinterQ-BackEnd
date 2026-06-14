@@ -27,7 +27,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/study")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*", allowedHeaders = "*")
+@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*", allowCredentials = "true")
 public class StudyController {
 
     private final GeminiAiService geminiAiService;
