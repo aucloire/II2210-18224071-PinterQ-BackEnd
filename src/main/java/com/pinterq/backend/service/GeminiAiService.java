@@ -26,6 +26,13 @@ public class GeminiAiService {
     private final ObjectMapper objectMapper;
     private final com.pinterq.backend.service.NotificationService notificationService;
 
+    @lombok.Data
+    @lombok.Builder
+    public static class GeneratedStudyData {
+        private java.util.List<Quiz> quizzes;
+        private java.util.List<Flashcard> flashcards;
+    }
+
     @Value("${gemini.api.url}")
     private String apiUrl;
 
@@ -40,8 +47,7 @@ public class GeminiAiService {
         this.objectMapper = new ObjectMapper();
     }
 
-    @Async
-    public void generateStudyMaterials(String textContent, Material savedMaterial) {
+    public GeneratedStudyData generateStudyMaterials(String textContent) {
         int maxRetries = 3;
         int retryCount = 0;
         
@@ -60,14 +66,14 @@ public class GeminiAiService {
                 part.put("text", prompt);
 
                 Map<String, Object> content = new HashMap<>();
-                content.put("parts", List.of(part));
+                content.put("parts", java.util.List.of(part));
 
                 // Modern Gemini API config for JSON
                 Map<String, Object> generationConfig = new HashMap<>();
                 generationConfig.put("response_mime_type", "application/json");
 
                 Map<String, Object> body = new HashMap<>();
-                body.put("contents", List.of(content));
+                body.put("contents", java.util.List.of(content));
                 body.put("generationConfig", generationConfig);
 
                 // HTTP POST
@@ -77,18 +83,12 @@ public class GeminiAiService {
                 HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
                 System.out.println("Calling Gemini API (Attempt " + (retryCount + 1) + "): " + apiUrl);
-                // Log masked API key for debugging
-                if (apiKey != null && apiKey.length() > 8) {
-                    System.out.println("Using API Key: " + apiKey.substring(0, 4) + "..." + apiKey.substring(apiKey.length() - 4));
-                }
 
                 ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
                 if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                     JsonNode root = objectMapper.readTree(response.getBody());
                     String aiResponseText = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
-
-                    System.out.println("AI RAW RESPONSE: " + aiResponseText);
 
                     // Pre-processing: Remove markdown code blocks if present
                     if (aiResponseText.contains("```json")) {
@@ -106,26 +106,26 @@ public class GeminiAiService {
 
                     // Parsing JSON dari AI
                     JsonNode resultJson = objectMapper.readTree(aiResponseText);
+                    java.util.List<Flashcard> flashcards = new java.util.ArrayList<>();
+                    java.util.List<Quiz> quizzes = new java.util.ArrayList<>();
 
-                    // Simpan Flashcards
+                    // Parse Flashcards
                     JsonNode flashcardsNode = resultJson.path("flashcards");
                     if (flashcardsNode.isArray()) {
                         for (JsonNode node : flashcardsNode) {
-                            Flashcard flashcard = Flashcard.builder()
+                            flashcards.add(Flashcard.builder()
                                     .question(node.path("question").asText())
                                     .answer(node.path("answer").asText())
-                                    .material(savedMaterial)
                                     .isMemorized(false)
-                                    .build();
-                            flashcardRepository.save(flashcard);
+                                    .build());
                         }
                     }
 
-                    // Simpan Quizzes
+                    // Parse Quizzes
                     JsonNode quizzesNode = resultJson.path("quizzes");
                     if (quizzesNode.isArray()) {
                         for (JsonNode node : quizzesNode) {
-                            Quiz quiz = Quiz.builder()
+                            quizzes.add(Quiz.builder()
                                     .question(node.path("question").asText())
                                     .optionA(node.path("optionA").asText())
                                     .optionB(node.path("optionB").asText())
@@ -133,42 +133,39 @@ public class GeminiAiService {
                                     .optionD(node.path("optionD").asText())
                                     .correctAnswer(node.path("correctAnswer").asText())
                                     .explanation(node.path("explanation").asText())
-                                    .material(savedMaterial)
-                                    .build();
-                            quizRepository.save(quiz);
+                                    .build());
                         }
                     }
-                    System.out.println("AI Generation Successful for Material: " + savedMaterial.getTitle());
-                    
-                    // Trigger notification
-                    try {
-                        notificationService.notifyUserOnGenerationComplete(savedMaterial.getUser().getId(), savedMaterial.getTitle());
-                    } catch (Exception e) {}
-                    
-                    return; // Success, exit method
+
+                    if (flashcards.isEmpty() && quizzes.isEmpty()) {
+                        throw new RuntimeException("AI returned empty results");
+                    }
+
+                    return GeneratedStudyData.builder()
+                            .flashcards(flashcards)
+                            .quizzes(quizzes)
+                            .build();
                 }
             } catch (org.springframework.web.client.HttpStatusCodeException e) {
-                System.err.println("Gemini API Error (Attempt " + (retryCount + 1) + "): " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
+                System.err.println("Gemini API Error (Attempt " + (retryCount + 1) + "): " + e.getStatusCode());
                 if (e.getStatusCode().value() == 503 || e.getStatusCode().value() == 429) {
                     retryCount++;
                     if (retryCount < maxRetries) {
                         try {
-                            System.out.println("Retrying in 5 seconds...");
-                            Thread.sleep(5000); // Wait 5s before retry
+                            Thread.sleep(5000);
                             continue;
                         } catch (InterruptedException ie) {
                             Thread.currentThread().interrupt();
                         }
                     }
                 }
-                break; // Other HTTP errors, don't retry
+                throw new RuntimeException("API AI sedang sibuk, silakan coba lagi");
             } catch (Exception e) {
                 System.err.println("Error generating study materials: " + e.getMessage());
-                e.printStackTrace();
-                break;
+                throw new RuntimeException(e.getMessage());
             }
         }
-        System.err.println("AI Generation FAILED after " + retryCount + " retries for Material: " + savedMaterial.getTitle());
+        throw new RuntimeException("Gagal memproses data melalui AI setelah beberapa percobaan");
     }
 
     @Async

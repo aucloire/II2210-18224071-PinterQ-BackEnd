@@ -20,6 +20,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.CrossOrigin;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -43,26 +47,29 @@ public class StudyController {
     public ResponseEntity<?> testAi() {
         try {
             Material testMaterial = Material.builder().title("Test").content("Test content").build();
-            geminiAiService.generateStudyMaterials("Apa itu Cloud Computing?", testMaterial);
-            return ResponseEntity.ok("AI request triggered. Check backend logs!");
+            // This is a test, keeping it simple
+            return ResponseEntity.ok("AI test endpoint simplified. Use /generate for real logic.");
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
     }
 
     @PostMapping("/generate")
+    @Transactional
     public ResponseEntity<?> generate(@RequestBody GenerateRequest request) {
         System.out.println(">>> RECEIVED GENERATE REQUEST: " + request);
         try {
             User user = userRepository.findById(request.getUserId())
-                    .orElseThrow(() -> new RuntimeException("User not found: " + request.getUserId()));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
             Category category = categoryRepository.findById(request.getCategoryId())
                     .or(() -> categoryRepository.findByClassGroup_Id(request.getCategoryId()))
-                    .orElseThrow(() -> new RuntimeException("Category/Class not found: " + request.getCategoryId()));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category/Class not found"));
 
-            System.out.println("Found User: " + user.getUsername() + ", Category: " + category.getName());
+            // 1. Panggil AI terlebih dahulu (Synchronous)
+            GeminiAiService.GeneratedStudyData aiData = geminiAiService.generateStudyMaterials(request.getContent());
 
+            // 2. Jika sukses, baru simpan Material
             Material material = Material.builder()
                     .user(user)
                     .title(request.getTitle())
@@ -71,23 +78,34 @@ public class StudyController {
                     .build();
 
             Material savedMaterial = materialRepository.save(material);
-            System.out.println("Saved Material ID: " + savedMaterial.getId());
 
-            // Notify students if part of a class
+            // 3. Simpan Kuis & Flashcard dengan relasi ke Material
+            if (aiData.getQuizzes() != null && !aiData.getQuizzes().isEmpty()) {
+                aiData.getQuizzes().forEach(q -> q.setMaterial(savedMaterial));
+                quizRepository.saveAll(aiData.getQuizzes());
+            }
+
+            if (aiData.getFlashcards() != null && !aiData.getFlashcards().isEmpty()) {
+                aiData.getFlashcards().forEach(f -> f.setMaterial(savedMaterial));
+                flashcardRepository.saveAll(aiData.getFlashcards());
+            }
+
+            // 4. Notifikasi
             try {
                 if (category.getClassGroup() != null) {
                     notificationService.notifyStudentsOnNewMaterial(category.getClassGroup(), savedMaterial.getTitle());
                 }
-            } catch (Exception e) {}
-
-            geminiAiService.generateStudyMaterials(request.getContent(), savedMaterial);
-            System.out.println("AI Task handed over to service (Async)");
+                notificationService.notifyUserOnGenerationComplete(user.getId(), savedMaterial.getTitle());
+            } catch (Exception e) {
+                System.err.println("Notification Error: " + e.getMessage());
+            }
 
             return ResponseEntity.ok(savedMaterial);
+        } catch (ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             System.err.println("GENERATE ERROR: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(500).body("Internal Error: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Gagal memproses data melalui AI, silakan coba lagi");
         }
     }
 
