@@ -88,7 +88,23 @@ public class GeminiAiService {
 
                 if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                     JsonNode root = objectMapper.readTree(response.getBody());
-                    String aiResponseText = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
+                    
+                    // Safety check for Gemini API response structure
+                    JsonNode candidates = root.path("candidates");
+                    if (candidates.isMissingNode() || candidates.isEmpty()) {
+                        System.err.println("Gemini API returned no candidates. Response: " + response.getBody());
+                        throw new RuntimeException("AI tidak memberikan respon, coba kurangi panjang teks");
+                    }
+
+                    JsonNode firstCandidate = candidates.get(0);
+                    JsonNode parts = firstCandidate.path("content").path("parts");
+                    if (parts.isMissingNode() || parts.isEmpty()) {
+                         System.err.println("Gemini API candidate has no parts. Response: " + response.getBody());
+                         throw new RuntimeException("AI gagal memproses materi ini");
+                    }
+
+                    String aiResponseText = parts.get(0).path("text").asText();
+                    System.out.println("AI RAW RESPONSE: " + aiResponseText);
 
                     // Pre-processing: Remove markdown code blocks if present
                     if (aiResponseText.contains("```json")) {
@@ -113,11 +129,15 @@ public class GeminiAiService {
                     JsonNode flashcardsNode = resultJson.path("flashcards");
                     if (flashcardsNode.isArray()) {
                         for (JsonNode node : flashcardsNode) {
-                            flashcards.add(Flashcard.builder()
-                                    .question(node.path("question").asText())
-                                    .answer(node.path("answer").asText())
-                                    .isMemorized(false)
-                                    .build());
+                            String q = node.path("question").asText();
+                            String a = node.path("answer").asText();
+                            if (!q.isBlank() && !a.isBlank()) {
+                                flashcards.add(Flashcard.builder()
+                                        .question(q)
+                                        .answer(a)
+                                        .isMemorized(false)
+                                        .build());
+                            }
                         }
                     }
 
@@ -125,20 +145,29 @@ public class GeminiAiService {
                     JsonNode quizzesNode = resultJson.path("quizzes");
                     if (quizzesNode.isArray()) {
                         for (JsonNode node : quizzesNode) {
-                            quizzes.add(Quiz.builder()
-                                    .question(node.path("question").asText())
-                                    .optionA(node.path("optionA").asText())
-                                    .optionB(node.path("optionB").asText())
-                                    .optionC(node.path("optionC").asText())
-                                    .optionD(node.path("optionD").asText())
-                                    .correctAnswer(node.path("correctAnswer").asText())
-                                    .explanation(node.path("explanation").asText())
-                                    .build());
+                            String question = node.path("question").asText();
+                            String optA = node.path("optionA").asText();
+                            String optB = node.path("optionB").asText();
+                            String optC = node.path("optionC").asText();
+                            String optD = node.path("optionD").asText();
+                            String correct = node.path("correctAnswer").asText();
+                            
+                            if (!question.isBlank() && !optA.isBlank() && !optB.isBlank()) {
+                                quizzes.add(Quiz.builder()
+                                        .question(question)
+                                        .optionA(optA)
+                                        .optionB(optB)
+                                        .optionC(optC)
+                                        .optionD(optD)
+                                        .correctAnswer(correct.isBlank() ? "A" : correct)
+                                        .explanation(node.path("explanation").asText())
+                                        .build());
+                            }
                         }
                     }
 
                     if (flashcards.isEmpty() && quizzes.isEmpty()) {
-                        throw new RuntimeException("AI returned empty results");
+                        throw new RuntimeException("AI tidak dapat menemukan poin penting untuk dibuat soal");
                     }
 
                     return GeneratedStudyData.builder()
@@ -147,7 +176,7 @@ public class GeminiAiService {
                             .build();
                 }
             } catch (org.springframework.web.client.HttpStatusCodeException e) {
-                System.err.println("Gemini API Error (Attempt " + (retryCount + 1) + "): " + e.getStatusCode());
+                System.err.println("Gemini API HTTP Error (Attempt " + (retryCount + 1) + "): " + e.getStatusCode());
                 if (e.getStatusCode().value() == 503 || e.getStatusCode().value() == 429) {
                     retryCount++;
                     if (retryCount < maxRetries) {
@@ -159,10 +188,15 @@ public class GeminiAiService {
                         }
                     }
                 }
-                throw new RuntimeException("API AI sedang sibuk, silakan coba lagi");
+                throw new RuntimeException("API AI sedang sibuk (" + e.getStatusCode() + "), silakan coba lagi");
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                System.err.println("JSON Parsing Error: " + e.getMessage());
+                retryCount++;
+                if (retryCount < maxRetries) continue;
+                throw new RuntimeException("Format respon AI tidak valid, silakan coba lagi");
             } catch (Exception e) {
                 System.err.println("Error generating study materials: " + e.getMessage());
-                throw new RuntimeException(e.getMessage());
+                throw new RuntimeException(e.getMessage() != null ? e.getMessage() : "Terjadi kesalahan internal pada AI");
             }
         }
         throw new RuntimeException("Gagal memproses data melalui AI setelah beberapa percobaan");

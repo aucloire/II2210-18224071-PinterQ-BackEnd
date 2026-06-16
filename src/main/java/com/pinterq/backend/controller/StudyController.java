@@ -59,27 +59,36 @@ public class StudyController {
     public ResponseEntity<?> generate(@RequestBody GenerateRequest request) {
         System.out.println(">>> RECEIVED GENERATE REQUEST: " + request);
         try {
-            User user = userRepository.findById(request.getUserId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+            Material material;
+            
+            // Jika ada ID, berarti kita mau nambah kuis/flashcard ke materi lama (Generate Lagi)
+            if (request.getId() != null) {
+                material = materialRepository.findById(request.getId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Materi tidak ditemukan"));
+            } else {
+                User user = userRepository.findById(request.getUserId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
-            Category category = categoryRepository.findById(request.getCategoryId())
-                    .or(() -> categoryRepository.findByClassGroup_Id(request.getCategoryId()))
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category/Class not found"));
+                Category category = categoryRepository.findById(request.getCategoryId())
+                        .or(() -> categoryRepository.findByClassGroup_Id(request.getCategoryId()))
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category/Class not found"));
 
-            // 1. Panggil AI terlebih dahulu (Synchronous)
-            GeminiAiService.GeneratedStudyData aiData = geminiAiService.generateStudyMaterials(request.getContent());
+                material = Material.builder()
+                        .user(user)
+                        .title(request.getTitle())
+                        .content(request.getContent())
+                        .category(category)
+                        .build();
+                
+                material = materialRepository.save(material);
+            }
 
-            // 2. Jika sukses, baru simpan Material
-            Material material = Material.builder()
-                    .user(user)
-                    .title(request.getTitle())
-                    .content(request.getContent())
-                    .category(category)
-                    .build();
+            // 1. Panggil AI terlebih dahulu (Synchronous) menggunakan konten materi
+            GeminiAiService.GeneratedStudyData aiData = geminiAiService.generateStudyMaterials(material.getContent());
 
-            Material savedMaterial = materialRepository.save(material);
+            final Material savedMaterial = material;
 
-            // 3. Simpan Kuis & Flashcard dengan relasi ke Material
+            // 2. Simpan Kuis & Flashcard dengan relasi ke Material
             if (aiData.getQuizzes() != null && !aiData.getQuizzes().isEmpty()) {
                 aiData.getQuizzes().forEach(q -> q.setMaterial(savedMaterial));
                 quizRepository.saveAll(aiData.getQuizzes());
@@ -90,12 +99,12 @@ public class StudyController {
                 flashcardRepository.saveAll(aiData.getFlashcards());
             }
 
-            // 4. Notifikasi
+            // 3. Notifikasi
             try {
-                if (category.getClassGroup() != null) {
-                    notificationService.notifyStudentsOnNewMaterial(category.getClassGroup(), savedMaterial.getTitle());
+                if (savedMaterial.getCategory() != null && savedMaterial.getCategory().getClassGroup() != null) {
+                    notificationService.notifyStudentsOnNewMaterial(savedMaterial.getCategory().getClassGroup(), savedMaterial.getTitle());
                 }
-                notificationService.notifyUserOnGenerationComplete(user.getId(), savedMaterial.getTitle());
+                notificationService.notifyUserOnGenerationComplete(savedMaterial.getUser().getId(), savedMaterial.getTitle());
             } catch (Exception e) {
                 System.err.println("Notification Error: " + e.getMessage());
             }
@@ -105,7 +114,7 @@ public class StudyController {
             throw e;
         } catch (Exception e) {
             System.err.println("GENERATE ERROR: " + e.getMessage());
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Gagal memproses data melalui AI, silakan coba lagi");
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Gagal memproses data melalui AI: " + e.getMessage());
         }
     }
 
@@ -138,8 +147,17 @@ public class StudyController {
     }
 
     @DeleteMapping("/materials/{id}")
+    @Transactional
     public ResponseEntity<?> deleteMaterial(@PathVariable Long id) {
-        materialRepository.deleteById(id);
+        Material material = materialRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found"));
+        
+        // Explicitly clear relationships
+        quizRepository.deleteAll(material.getQuizzes());
+        flashcardRepository.deleteAll(material.getFlashcards());
+        quizAttemptRepository.deleteAll(material.getAttempts());
+        
+        materialRepository.delete(material);
         return ResponseEntity.ok("Materi dihapus");
     }
 
@@ -187,47 +205,17 @@ public class StudyController {
 
     @GetMapping("/flashcards/{categoryId}")
     public ResponseEntity<?> getFlashcardsByCategory(@PathVariable Long categoryId) {
-        var flashcards = flashcardRepository.findAll().stream()
-                .filter(f -> f.getMaterial() != null)
-                .filter(f -> {
-                    Material m = f.getMaterial();
-                    if (m.getCategory() != null) {
-                        if (m.getCategory().getId().equals(categoryId)) return true;
-                        if (m.getCategory().getClassGroup() != null && m.getCategory().getClassGroup().getId().equals(categoryId)) return true;
-                    }
-                    return false;
-                })
-                .toList();
-        return ResponseEntity.ok(flashcards);
+        return ResponseEntity.ok(flashcardRepository.findByCategoryIdOrClassId(categoryId));
     }
 
     @GetMapping("/quizzes/{categoryId}")
     public ResponseEntity<?> getQuizzesByCategory(@PathVariable Long categoryId) {
-        var quizzes = quizRepository.findAll().stream()
-                .filter(q -> q.getMaterial() != null)
-                .filter(q -> {
-                    Material m = q.getMaterial();
-                    if (m.getCategory() != null) {
-                        if (m.getCategory().getId().equals(categoryId)) return true;
-                        if (m.getCategory().getClassGroup() != null && m.getCategory().getClassGroup().getId().equals(categoryId)) return true;
-                    }
-                    return false;
-                })
-                .toList();
-        return ResponseEntity.ok(quizzes);
+        return ResponseEntity.ok(quizRepository.findByCategoryIdOrClassId(categoryId));
     }
 
     @GetMapping("/materials/{categoryId}")
     public ResponseEntity<?> getMaterialsByCategory(@PathVariable Long categoryId) {
-        var materials = materialRepository.findAll().stream()
-                .filter(m -> m.getCategory() != null)
-                .filter(m -> {
-                    if (m.getCategory().getId().equals(categoryId)) return true;
-                    if (m.getCategory().getClassGroup() != null && m.getCategory().getClassGroup().getId().equals(categoryId)) return true;
-                    return false;
-                })
-                .toList();
-        return ResponseEntity.ok(materials);
+        return ResponseEntity.ok(materialRepository.findByCategoryIdOrClassId(categoryId));
     }
 
     @PostMapping("/generate-adaptive")
@@ -285,6 +273,7 @@ public class StudyController {
 
     @Data
     static class GenerateRequest {
+        private Long id; // Untuk Generate Lagi (Append)
         private Long userId;
         private Long categoryId;
         private String title;
