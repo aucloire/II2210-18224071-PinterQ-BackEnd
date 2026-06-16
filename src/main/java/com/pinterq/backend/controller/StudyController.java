@@ -149,16 +149,20 @@ public class StudyController {
     @DeleteMapping("/materials/{id}")
     @Transactional
     public ResponseEntity<?> deleteMaterial(@PathVariable Long id) {
-        Material material = materialRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found"));
-        
-        // Explicitly clear relationships
-        quizRepository.deleteAll(material.getQuizzes());
-        flashcardRepository.deleteAll(material.getFlashcards());
-        quizAttemptRepository.deleteAll(material.getAttempts());
-        
-        materialRepository.delete(material);
-        return ResponseEntity.ok("Materi dihapus");
+        System.out.println(">>> REQUEST TO DELETE MATERIAL ID: " + id);
+        try {
+            // Manual delete to ensure constraints are cleared regardless of Hibernate's cascade state
+            quizRepository.deleteByMaterialId(id);
+            flashcardRepository.deleteByMaterialId(id);
+            quizAttemptRepository.deleteByMaterialId(id);
+            
+            materialRepository.deleteById(id);
+            return ResponseEntity.ok("Materi berhasil dihapus");
+        } catch (Exception e) {
+            System.err.println("DELETE ERROR: " + e.getMessage());
+            e.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Gagal menghapus materi: " + e.getMessage());
+        }
     }
 
     @PostMapping("/quizzes")
