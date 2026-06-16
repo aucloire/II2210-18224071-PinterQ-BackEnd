@@ -21,6 +21,11 @@ public class Quiz {
     @JoinColumn(name = "material_id", nullable = false)
     private Material material;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("materialId")
+    public Long getMaterialId() {
+        return material != null ? material.getId() : null;
+    }
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String question;
 

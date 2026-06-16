@@ -38,4 +38,7 @@ public class Material {
 
     @OneToMany(mappedBy = "material", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Quiz> quizzes;
+
+    @OneToMany(mappedBy = "material", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<QuizAttempt> attempts;
 }
