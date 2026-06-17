@@ -58,14 +58,19 @@ public class StudyController {
     @Transactional
     public ResponseEntity<?> generate(@RequestBody GenerateRequest request) {
         System.out.println(">>> RECEIVED GENERATE REQUEST: " + request);
+        System.out.println("DEBUG: materialId from request = " + request.getMaterialId());
+        
         try {
             Material material;
             
-            // Jika ada ID, berarti kita mau nambah kuis/flashcard ke materi lama (Generate Lagi)
-            if (request.getId() != null) {
-                material = materialRepository.findById(request.getId())
+            // Jika ada materialId, berarti kita mau nambah kuis/flashcard ke materi lama (Generate Lagi)
+            if (request.getMaterialId() != null) {
+                System.out.println("DEBUG: Attempting to find existing material with ID: " + request.getMaterialId());
+                material = materialRepository.findById(request.getMaterialId())
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Materi tidak ditemukan"));
+                System.out.println("DEBUG: Found existing material: " + material.getTitle());
             } else {
+                System.out.println("DEBUG: Creating NEW material...");
                 User user = userRepository.findById(request.getUserId())
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
@@ -81,6 +86,7 @@ public class StudyController {
                         .build();
                 
                 material = materialRepository.save(material);
+                System.out.println("DEBUG: Saved new material with ID: " + material.getId());
             }
 
             // 1. Panggil AI terlebih dahulu (Synchronous) menggunakan konten materi
@@ -278,7 +284,7 @@ public class StudyController {
 
     @Data
     static class GenerateRequest {
-        private Long id; // Untuk Generate Lagi (Append)
+        private Long materialId; // Rename dari 'id' untuk menghindari konflik mapping
         private Long userId;
         private Long categoryId;
         private String title;
