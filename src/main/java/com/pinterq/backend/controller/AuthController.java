@@ -2,9 +2,7 @@ package com.pinterq.backend.controller;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import javax.crypto.SecretKey;
 
@@ -12,7 +10,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.CrossOrigin;
 
 import com.pinterq.backend.model.User;
 import com.pinterq.backend.repository.UserRepository;
@@ -126,41 +123,6 @@ public class AuthController {
             "profileImageUrl", user.getProfileImageUrl() != null ? user.getProfileImageUrl() : "",
             "approvalStatus", user.getApprovalStatus().name()
         ));
-    }
-
-    @GetMapping("/users")
-    public ResponseEntity<?> getAllUsers() {
-        List<Map<String, Object>> users = userRepository.findAll().stream()
-                .map(u -> Map.<String, Object>of(
-                    "id", u.getId(),
-                    "username", u.getUsername(),
-                    "email", u.getEmail(),
-                    "fullName", u.getFullName() != null ? u.getFullName() : "",
-                    "role", u.getRole().name(),
-                    "profileImageUrl", u.getProfileImageUrl() != null ? u.getProfileImageUrl() : "",
-                    "approvalStatus", u.getApprovalStatus().name(),
-                    "createdAt", u.getCreatedAt() != null ? u.getCreatedAt().toString() : ""
-                ))
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(users);
-    }
-
-    @PutMapping("/users/{userId}/approve")
-    public ResponseEntity<?> approveUser(@PathVariable Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User tidak ditemukan"));
-        user.setApprovalStatus(User.ApprovalStatus.APPROVED);
-        userRepository.save(user);
-        return ResponseEntity.ok(Map.of("message", "User " + user.getUsername() + " telah disetujui"));
-    }
-
-    @PutMapping("/users/{userId}/reject")
-    public ResponseEntity<?> rejectUser(@PathVariable Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User tidak ditemukan"));
-        user.setApprovalStatus(User.ApprovalStatus.REJECTED);
-        userRepository.save(user);
-        return ResponseEntity.ok(Map.of("message", "User " + user.getUsername() + " telah ditolak"));
     }
 
     @Data
