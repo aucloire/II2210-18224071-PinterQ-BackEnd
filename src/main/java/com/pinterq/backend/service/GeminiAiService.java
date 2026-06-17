@@ -68,13 +68,8 @@ public class GeminiAiService {
                 Map<String, Object> content = new HashMap<>();
                 content.put("parts", java.util.List.of(part));
 
-                // Modern Gemini API config for JSON
-                Map<String, Object> generationConfig = new HashMap<>();
-                generationConfig.put("response_mime_type", "application/json");
-
                 Map<String, Object> body = new HashMap<>();
                 body.put("contents", java.util.List.of(content));
-                body.put("generationConfig", generationConfig);
 
                 // HTTP POST
                 String url = apiUrl + "?key=" + apiKey;
@@ -93,7 +88,7 @@ public class GeminiAiService {
                     JsonNode candidates = root.path("candidates");
                     if (candidates.isMissingNode() || candidates.isEmpty()) {
                         System.err.println("Gemini API returned no candidates. Response: " + response.getBody());
-                        throw new RuntimeException("AI tidak memberikan respon, coba kurangi panjang teks");
+                        throw new RuntimeException("AI tidak memberikan respon (Safety Block), coba kurangi sensitivitas materi");
                     }
 
                     JsonNode firstCandidate = candidates.get(0);
@@ -176,19 +171,24 @@ public class GeminiAiService {
                             .build();
                 }
             } catch (org.springframework.web.client.HttpStatusCodeException e) {
-                System.err.println("Gemini API HTTP Error (Attempt " + (retryCount + 1) + "): " + e.getStatusCode());
+                String googleError = e.getResponseBodyAsString();
+                System.err.println("Google API Error: " + googleError);
+                
                 if (e.getStatusCode().value() == 503 || e.getStatusCode().value() == 429) {
                     retryCount++;
                     if (retryCount < maxRetries) {
-                        try {
-                            Thread.sleep(5000);
-                            continue;
-                        } catch (InterruptedException ie) {
-                            Thread.currentThread().interrupt();
-                        }
+                        try { Thread.sleep(5000); continue; } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
                     }
                 }
-                throw new RuntimeException("API AI sedang sibuk (" + e.getStatusCode() + "), silakan coba lagi");
+                
+                // Return the actual error message from Google to the frontend
+                try {
+                    JsonNode errorNode = objectMapper.readTree(googleError);
+                    String msg = errorNode.path("error").path("message").asText();
+                    if (!msg.isEmpty()) throw new RuntimeException("Google API: " + msg);
+                } catch (Exception ignored) {}
+                
+                throw new RuntimeException("Google API Error (" + e.getStatusCode() + "): " + googleError);
             } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
                 System.err.println("JSON Parsing Error: " + e.getMessage());
                 retryCount++;
@@ -225,13 +225,8 @@ public class GeminiAiService {
             Map<String, Object> content = new HashMap<>();
             content.put("parts", List.of(part));
 
-            // Modern Gemini API config for JSON
-            Map<String, Object> generationConfig = new HashMap<>();
-            generationConfig.put("response_mime_type", "application/json");
-
             Map<String, Object> body = new HashMap<>();
             body.put("contents", List.of(content));
-            body.put("generationConfig", generationConfig);
 
             String url = apiUrl + "?key=" + apiKey;
             HttpHeaders headers = new HttpHeaders();
@@ -239,10 +234,6 @@ public class GeminiAiService {
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
             System.out.println("Calling Gemini API Adaptive: " + apiUrl);
-            // Log masked API key for debugging
-            if (apiKey != null && apiKey.length() > 8) {
-                System.out.println("Using API Key: " + apiKey.substring(0, 4) + "..." + apiKey.substring(apiKey.length() - 4));
-            }
 
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
@@ -285,8 +276,6 @@ public class GeminiAiService {
                     }
                 }
             }
-        } catch (org.springframework.web.client.HttpStatusCodeException e) {
-            System.err.println("Gemini API Adaptive HTTP Error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
         } catch (Exception e) {
             System.err.println("Error generating adaptive quizzes: " + e.getMessage());
             e.printStackTrace();

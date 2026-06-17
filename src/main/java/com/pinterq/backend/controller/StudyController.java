@@ -114,7 +114,8 @@ public class StudyController {
             throw e;
         } catch (Exception e) {
             System.err.println("GENERATE ERROR: " + e.getMessage());
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Gagal memproses data melalui AI: " + e.getMessage());
+            e.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
         }
     }
 
