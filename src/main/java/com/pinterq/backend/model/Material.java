@@ -24,6 +24,11 @@ public class Material {
     @JoinColumn(name = "category_id")
     private Category category;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("userId")
+    public Long getUserId() {
+        return user != null ? user.getId() : null;
+    }
+
     @Column(nullable = false)
     private String title;
 

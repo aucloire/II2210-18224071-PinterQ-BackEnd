@@ -26,13 +26,18 @@ public class Category {
     @JoinColumn(name = "class_id")
     private ClassGroup classGroup;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String name;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("userId")
+    public Long getUserId() {
+        return user != null ? user.getId() : null;
+    }
 
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @JsonIgnore
-    @OneToMany(mappedBy = "category", fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "category", cascade = CascadeType.ALL)
     private List<Material> materials;
 }
