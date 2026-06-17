@@ -2,10 +2,12 @@ package com.pinterq.backend.controller;
 
 import com.pinterq.backend.model.User;
 import com.pinterq.backend.repository.UserRepository;
+import com.pinterq.backend.repository.ClassMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -17,6 +19,7 @@ import java.util.Map;
 public class AdminController {
 
     private final UserRepository userRepository;
+    private final ClassMemberRepository classMemberRepository;
 
     @GetMapping("/pending-users")
     public ResponseEntity<?> getPendingUsers() {
@@ -81,10 +84,15 @@ public class AdminController {
     }
 
     @DeleteMapping("/{userId}")
+    @Transactional
     public ResponseEntity<?> deleteUser(@PathVariable Long userId) {
         if (!userRepository.existsById(userId)) {
             return ResponseEntity.notFound().build();
         }
+        
+        // Manual cleanup for tables that sometimes block Hibernate's cascade
+        classMemberRepository.deleteByUserId(userId);
+        
         userRepository.deleteById(userId);
         return ResponseEntity.ok(Map.of("message", "Pengguna berhasil dihapus", "userId", userId));
     }
