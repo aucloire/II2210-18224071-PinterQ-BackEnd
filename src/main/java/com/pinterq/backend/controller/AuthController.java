@@ -11,13 +11,7 @@ import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.CrossOrigin;
 
 import com.pinterq.backend.model.User;
@@ -31,7 +25,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*", allowCredentials = "true")
+@CrossOrigin(origins = "https://aucloire.stei.my.id", allowedHeaders = "*", allowCredentials = "true")
 public class AuthController {
 
     private final UserRepository userRepository;
@@ -75,7 +69,6 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "Email sudah dipakai"));
         }
 
-        // Determine role: default to MURID if not specified or invalid
         User.Role resolvedRole;
         try {
             resolvedRole = (request.getRole() != null && !request.getRole().isBlank())
@@ -84,7 +77,6 @@ public class AuthController {
         } catch (IllegalArgumentException e) {
             resolvedRole = User.Role.MURID;
         }
-        // Only GURU and MURID are allowed for regular registration
         if (resolvedRole == User.Role.SUPERADMIN) {
             resolvedRole = User.Role.MURID;
         }
@@ -99,12 +91,10 @@ public class AuthController {
                 .build();
         userRepository.save(newUser);
 
-        // Notify Admins
         try {
             notificationService.notifyAdminsOnRegistration(newUser.getUsername());
         } catch (Exception e) {}
 
-        // Do NOT generate token — user must wait for approval
         return ResponseEntity.ok(Map.of(
             "message", "Registrasi berhasil. Silakan tunggu persetujuan superadmin.",
             "requiresApproval", true
