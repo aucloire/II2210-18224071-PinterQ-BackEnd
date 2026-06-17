@@ -1,13 +1,19 @@
 package com.pinterq.backend.controller;
 
 import com.pinterq.backend.model.User;
+import com.pinterq.backend.model.ClassGroup;
 import com.pinterq.backend.repository.UserRepository;
 import com.pinterq.backend.repository.ClassMemberRepository;
+import com.pinterq.backend.repository.ClassGroupRepository;
+import com.pinterq.backend.repository.CategoryRepository;
+import com.pinterq.backend.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -20,6 +26,9 @@ public class AdminController {
 
     private final UserRepository userRepository;
     private final ClassMemberRepository classMemberRepository;
+    private final ClassGroupRepository classGroupRepository;
+    private final CategoryRepository categoryRepository;
+    private final NotificationRepository notificationRepository;
 
     @GetMapping("/pending-users")
     public ResponseEntity<?> getPendingUsers() {
@@ -86,14 +95,29 @@ public class AdminController {
     @DeleteMapping("/{userId}")
     @Transactional
     public ResponseEntity<?> deleteUser(@PathVariable Long userId) {
-        if (!userRepository.existsById(userId)) {
-            return ResponseEntity.notFound().build();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pengguna tidak ditemukan"));
+        
+        try {
+            // 1. Bersihkan notifikasi
+            notificationRepository.deleteAll(user.getNotifications());
+            
+            // 2. Bersihkan keanggotaan kelas (ClassMember)
+            classMemberRepository.deleteByUserId(userId);
+            
+            // 3. Bersihkan kategori & materi milik user
+            categoryRepository.deleteAll(user.getCategories());
+            
+            // 4. Jika guru, hapus kelas yang diajar (ini akan mentrigger cascade ke materi kelas tersebut)
+            classGroupRepository.deleteByTeacherId(userId);
+            
+            // 5. Akhirnya hapus user
+            userRepository.delete(user);
+            
+            return ResponseEntity.ok(Map.of("message", "Pengguna berhasil dihapus", "userId", userId));
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Gagal menghapus pengguna: " + e.getMessage());
         }
-        
-        // Manual cleanup for tables that sometimes block Hibernate's cascade
-        classMemberRepository.deleteByUserId(userId);
-        
-        userRepository.deleteById(userId);
-        return ResponseEntity.ok(Map.of("message", "Pengguna berhasil dihapus", "userId", userId));
     }
 }
