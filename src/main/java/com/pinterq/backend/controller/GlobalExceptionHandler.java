@@ -1,4 +1,4 @@
-package com.pinterq.backend.config;
+package com.pinterq.backend.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +16,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleResponseStatusException(ResponseStatusException ex) {
         Map<String, Object> body = new HashMap<>();
         body.put("status", ex.getStatusCode().value());
-        body.put("error", ex.getReason());
+        body.put("error", "Exception");
         body.put("message", ex.getReason());
         return new ResponseEntity<>(body, ex.getStatusCode());
     }
@@ -30,11 +30,11 @@ public class GlobalExceptionHandler {
         body.put("message", ex.getMessage());
         body.put("details", ex.getClass().getSimpleName());
         
-        // Print stack trace for debugging in logs
         StringBuilder sb = new StringBuilder();
+        int count = 0;
         for (StackTraceElement ste : ex.getStackTrace()) {
             sb.append(ste.toString()).append("\n");
-            if (sb.length() > 500) break; // Limit length
+            if (++count > 10) break; 
         }
         body.put("stack", sb.toString());
         
